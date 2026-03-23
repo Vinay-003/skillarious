@@ -8,6 +8,8 @@ import { toast } from 'react-hot-toast'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { FileUpload } from '@/components/FileUpload'
+import ContentDoubtsThread from '@/components/ContentDoubtsThread'
+import { resolveMediaUrl } from '@/utils/mediaUrl'
 
 export default function ClassVideosPage({ params }: { params: { moduleId: string } }) {
     const { user } = useAuth()
@@ -209,7 +211,7 @@ export default function ClassVideosPage({ params }: { params: { moduleId: string
                                         ref={videoRef}
                                         controls
                                         className="w-full rounded-lg"
-                                        src={cls.fileId}
+                                        src={resolveMediaUrl(cls.fileUrl)}
                                         onTimeUpdate={() => handleTimeUpdate(cls.id)}
                                     >
                                         Your browser does not support the video tag.
@@ -220,6 +222,13 @@ export default function ClassVideosPage({ params }: { params: { moduleId: string
                                             style={{width: `${videoProgress[cls.id] || 0}%`}}
                                         ></div>
                                     </div>
+
+                                    <ContentDoubtsThread
+                                        contentId={cls.id}
+                                        contentLabel={`Video ${cls.order || 1}`}
+                                        allowAsk={!user?.isEducator}
+                                        canReply={Boolean(user?.isEducator)}
+                                    />
                                 </div>
                             )}
                         </div>

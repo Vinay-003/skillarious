@@ -29,7 +29,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: SignupData) => Promise<void>;
+  signup: (data: SignupData) => Promise<any>;
   logout: () => Promise<void>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (data: SignupData) => {
     try {
       const response = await authService.signup(data);
-      return response.data;
+      return response;
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to create account');
     }
@@ -215,7 +215,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-
 
 
 

@@ -122,6 +122,7 @@ export interface Class {
   views?: number;
   duration?: Date;
   fileId?: string;
+  fileUrl?: string;
 }
 
 // Content related types

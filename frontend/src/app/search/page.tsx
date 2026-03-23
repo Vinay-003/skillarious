@@ -8,7 +8,7 @@ import categoryService from '@/services/category.service';
 import { Course, Category } from '@/types';
 import { FollowerPointerCard } from '@/components/ui/following-pointer';
 import Image from 'next/image';
-import { CourseCardSkeleton } from '@/components/CourseCard';
+import { CourseCardSkeleton } from '@/components/CourseCardSkeleton';
 
 interface TitleComponentProps {
   title: string;
@@ -137,34 +137,39 @@ export default function SearchPage() {
                 />
               }
             >
-              <div className="group relative h-full overflow-hidden rounded-2xl border border-zinc-100 bg-white transition duration-200 hover:shadow-xl">
-                <div className="relative aspect-[16/10] w-full overflow-hidden rounded-tl-lg rounded-tr-lg bg-gray-100">
+              <div className="group relative h-full overflow-hidden rounded-2xl border border-gray-700 bg-gray-800 transition duration-200 hover:shadow-xl hover:shadow-black/30">
+                <div className="relative aspect-[16/10] w-full overflow-hidden rounded-tl-lg rounded-tr-lg bg-gray-700">
                   <Image
                     src={course.thumbnail || "/course/placeholder.png"}
                     alt={`${course.name} thumbnail`}
-                    layout="fill"
-                    objectFit="cover"
+                    fill
                     className="transform object-cover transition duration-200 group-hover:scale-95 group-hover:rounded-2xl"
                   />
                 </div>
-                <div className="p-4">
-                  <h2 className="my-4 text-lg font-bold text-zinc-700 line-clamp-2">
+                <div className="p-4 flex h-full flex-col">
+                  <h2 className="my-4 text-lg font-bold text-white line-clamp-2">
                     {course.name}
                   </h2>
-                  <div className="flex flex-col font-normal text-zinc-500 gap-1">
+                  <div className="flex flex-col font-normal text-gray-300 gap-1">
                     <p className="text-sm line-clamp-2">{course.about}</p>
-                    <p className="text-sm font-normal text-zinc-500 line-clamp-2">
+                    <p className="text-sm font-normal text-gray-400 line-clamp-2">
                       {course.description}
                     </p>
                   </div>
-                  <div className="mt-10 flex flex-row items-center justify-between">
-                    <span className="text-sm text-gray-500">
-                      {new Date(course?.start).toLocaleDateString()}
-                    </span>
-                    <Link href={`/courses/access/${course.id}`}>
-                      <div className="relative z-10 block rounded-sm bg-[#2b0f48] hover:bg-[#2b0f48]/80 px-6 py-2 text-xs font-bold text-white transition-colors duration-200">
-                        View
-                      </div>
+                  <div className="mt-6 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-sm leading-none text-gray-400">
+                        {course?.start ? new Date(course.start).toLocaleDateString() : 'Date not set'}
+                      </span>
+                      <span className="text-sm font-semibold text-emerald-600">
+                        {Number(course?.price) === 0 ? 'Free' : `₹${course?.price}`}
+                      </span>
+                    </div>
+                    <Link
+                      href={`/courses/${course.id}`}
+                      className="relative z-10 inline-flex rounded-sm bg-red-600 px-6 py-2 text-xs font-bold text-white transition-colors duration-200 hover:bg-red-700"
+                    >
+                      View
                     </Link>
                   </div>
                 </div>
@@ -183,5 +188,3 @@ export default function SearchPage() {
     </div>
   );
 }
-
-

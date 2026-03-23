@@ -40,13 +40,13 @@ export default function SignUp() {
       const response = await signup(signupData);
       
       if (response.success) {
-        toast.success('Account created successfully! Please verify your email.');
+        toast.success('Account created successfully! Please login.');
         
         if (formData.accountType === 'instructor') {
           localStorage.setItem('pendingEducatorRegistration', 'true');
         }
         
-        router.push('/verify-email?email=' + encodeURIComponent(formData.email));
+        router.push('/login');
       }
     } catch (error: any) {
       toast.error(error.response?.data?.message || error.message || 'Failed to create account');
@@ -152,7 +152,6 @@ export default function SignUp() {
     </div>
   );
 }
-
 
 
 

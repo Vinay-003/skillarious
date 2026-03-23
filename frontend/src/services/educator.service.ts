@@ -86,15 +86,8 @@ async toggleDoubtAvailability() {
 
   async getEducatorCourses() {
     try {
-      const authResponse = await authService.validateSession();
-      const userId = authResponse?.user?.id;
-      
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
-
-      // Get educator ID first
-      const educatorResponse = await axios.get(`${API_URL}/educators/profile/${userId}`, {
+      // Get current educator profile first
+      const educatorResponse = await axios.get(`${API_URL}/educators/profile`, {
         headers: this.getHeaders()
       });
       
@@ -126,7 +119,6 @@ async toggleDoubtAvailability() {
 
 }
 export default new EducatorService();
-
 
 
 

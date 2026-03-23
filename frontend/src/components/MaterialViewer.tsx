@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { resolveMediaUrl } from '@/utils/mediaUrl';
 
 interface MaterialViewerProps {
     fileUrl: string;
@@ -11,6 +12,7 @@ interface MaterialViewerProps {
 
 export default function MaterialViewer({ fileUrl, fileType, title, onClose }: MaterialViewerProps) {
     const [loading, setLoading] = useState(true);
+    const resolvedUrl = resolveMediaUrl(fileUrl);
 
     const renderContent = () => {
         const fileTypeLower = fileType.toLowerCase();
@@ -18,7 +20,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
         if (fileTypeLower.includes('pdf')) {
             return (
                 <iframe
-                    src={`${fileUrl}#view=fit`}
+                    src={`${resolvedUrl}#view=fit`}
                     className="w-full h-[80vh]"
                     onLoad={() => setLoading(false)}
                 />
@@ -26,7 +28,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
         } else if (fileTypeLower.includes('image')) {
             return (
                 <img
-                    src={fileUrl}
+                    src={resolvedUrl}
                     alt={title}
                     className="max-w-full max-h-[80vh] object-contain"
                     onLoad={() => setLoading(false)}
@@ -39,7 +41,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
                     className="max-w-full max-h-[80vh]"
                     onLoadedData={() => setLoading(false)}
                 >
-                    <source src={fileUrl} type={fileType} />
+                    <source src={resolvedUrl} type={fileType} />
                     Your browser does not support the video tag.
                 </video>
             );
@@ -50,7 +52,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
                     className="w-full"
                     onLoadedData={() => setLoading(false)}
                 >
-                    <source src={fileUrl} type={fileType} />
+                    <source src={resolvedUrl} type={fileType} />
                     Your browser does not support the audio tag.
                 </audio>
             );
@@ -60,7 +62,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
                 <div className="text-center p-8">
                     <p className="mb-4">This file type cannot be previewed directly.</p>
                     <a
-                        href={fileUrl}
+                        href={resolvedUrl}
                         download
                         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                     >

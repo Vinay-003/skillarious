@@ -68,7 +68,7 @@ const FAQ = () => {
               transformOrigin: "top center"
             }}
           >
-            <span className="text-white">What Users </span>
+            <span className="text-white"></span>
             <motion.span 
               className="text-[#FF6B47] inline-block relative"
               animate={{
@@ -81,7 +81,7 @@ const FAQ = () => {
                 delay: 0.5
               }}
             >
-              Say
+              FAQs
               <span className="absolute bottom-0 left-0 w-full h-1 bg-[#FF6B47] rounded-full"></span>
             </motion.span>
           </motion.div>

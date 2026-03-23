@@ -3,81 +3,75 @@ import Link from 'next/link';
 
 export default function LandingHero() {
   return (
-    <div className="min-h-screen bg-black">
-      <div className="container mx-auto px-4 pt-32">
-        <button className="mx-auto block px-4 py-2 bg-[#2A2A2A] text-[#FF6B6B] rounded-full text-sm mb-8">
-          Meet your Instructor
-        </button>
+    <section className="min-h-screen bg-black">
+      <div className="container mx-auto px-4 pt-28 pb-16">
+        <div className="mx-auto mb-8 w-fit rounded-full bg-[#2A2A2A] px-4 py-2 text-sm text-[#FF6B6B]">
+          Instructor spotlight
+        </div>
 
-        <h1 className="text-5xl md:text-6xl font-bold text-white text-center mb-16">
-          The Architect of Your Success
+        <h1 className="mb-12 text-center text-4xl font-bold text-white md:text-6xl">
+          Learn with proven instructors
         </h1>
 
-        <div className="flex flex-col md:flex-row items-center justify-between gap-12">
+        <div className="flex flex-col items-center justify-between gap-12 md:flex-row">
           <div className="max-w-xl">
-            <div className="mb-8">
-              <blockquote className="text-lg text-gray-300 mb-6">
-                A Google Software Engineer, ex-Amazon and Media.net, with offers from Facebook London, 
-                and a competitive coding ace with CodeChef Master and 6★ Codechef accolades.
-              </blockquote>
-              
-              <div className="text-gray-400">
-                Find more about me on
-                <div className="flex gap-4 mt-4">
-                  <Link href="https://instagram.com" className="text-gray-400 hover:text-white">
-                    <Image src="/icons/instagram.svg" alt="Instagram" width={24} height={24} />
-                  </Link>
-                  <Link href="https://linkedin.com" className="text-gray-400 hover:text-white">
-                    <Image src="/icons/linkedin.svg" alt="LinkedIn" width={24} height={24} />
-                  </Link>
-                  <Link href="https://twitter.com" className="text-gray-400 hover:text-white">
-                    <Image src="/icons/twitter.svg" alt="Twitter" width={24} height={24} />
-                  </Link>
-                </div>
-              </div>
+            <blockquote className="mb-6 text-lg text-gray-300">
+              Build practical skills through structured lessons, guided projects, and direct support.
+            </blockquote>
+
+            <p className="mb-6 text-gray-400">
+              Every course is organized into modules with clear outcomes, so students know exactly what to do next.
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              <Link href="/courses" className="rounded-md bg-[#FF6B6B] px-5 py-2 text-white hover:bg-[#FF5252]">
+                Browse Courses
+              </Link>
+              <Link href="/educator/register" className="rounded-md border border-gray-600 px-5 py-2 text-gray-200 hover:border-gray-500">
+                Become an Educator
+              </Link>
             </div>
 
-            <div className="bg-[#1A1A1A] rounded-xl p-4 flex items-center gap-4 max-w-md">
-              <Image 
-                src="/images/profile-small.jpg" 
-                alt="Raj Vikramaditya" 
-                width={48} 
-                height={48} 
-                className="rounded-full"
-              />
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-white font-semibold">Raj Vikramaditya</h3>
-                  <Image src="/icons/verified.svg" alt="Verified" width={16} height={16} />
+            <div className="mt-8 max-w-md rounded-xl bg-[#1A1A1A] p-4">
+              <div className="flex items-center gap-4">
+                <Image
+                  src="/instructor-profile.jpg"
+                  alt="Featured instructor"
+                  width={56}
+                  height={56}
+                  className="h-14 w-14 rounded-full object-cover"
+                />
+                <div>
+                  <h3 className="font-semibold text-white">Featured Instructor</h3>
+                  <p className="text-sm text-gray-400">Mentoring students across coding and system design tracks</p>
                 </div>
-                <p className="text-sm text-gray-400">Founder takeUforward | SWE-III @ Google</p>
               </div>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="w-[500px] h-[500px] rounded-full bg-[#FF6B6B] opacity-90">
+          <div className="relative w-full max-w-[500px]">
+            <div className="relative mx-auto h-[320px] w-[320px] overflow-hidden rounded-full border-4 border-[#FF6B6B]/50 bg-[#FF6B6B]/20 md:h-[460px] md:w-[460px]">
               <Image
-                src="/images/raj-profile.png"
-                alt="Raj Vikramaditya"
-                width={500}
-                height={500}
+                src="/instructor-profile.jpg"
+                alt="Instructor profile"
+                fill
                 className="object-cover"
+                sizes="(max-width: 768px) 320px, 460px"
               />
             </div>
-            
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 bg-[#1A1A1A] px-6 py-4 rounded-xl">
-              <p className="text-center text-sm text-gray-400 mb-4">Bringing work experience from</p>
-              <div className="flex items-center gap-6">
-                <Image src="/logos/google.svg" alt="Google" width={80} height={24} />
-                <Image src="/logos/amazon.svg" alt="Amazon" width={80} height={24} />
-                <Image src="/logos/medianet.svg" alt="Media.net" width={80} height={24} />
-                <Image src="/logos/meta.svg" alt="Meta" width={80} height={24} />
+
+            <div className="absolute bottom-0 left-1/2 w-[92%] -translate-x-1/2 rounded-xl bg-[#1A1A1A] px-4 py-4 md:w-auto md:px-6">
+              <p className="mb-3 text-center text-sm text-gray-400">Learners from companies like</p>
+              <div className="flex items-center justify-center gap-4 md:gap-6">
+                <Image src="/companies/google.svg" alt="Google" width={72} height={22} />
+                <Image src="/companies/amazon.svg" alt="Amazon" width={72} height={22} />
+                <Image src="/companies/meta.svg" alt="Meta" width={72} height={22} />
+                <Image src="/companies/microsoft.svg" alt="Microsoft" width={72} height={22} />
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

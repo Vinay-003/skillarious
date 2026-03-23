@@ -86,7 +86,7 @@ export default function CourseReviews({ courseId }: { courseId: string }) {
             {(!userReview || isEditing) && (
                 <form onSubmit={handleSubmitReview} className="space-y-4">
                     <div>
-                        <label className="block mb-2">Rating</label>
+                        <label className="block mb-2 text-white">Rating</label>
                         <div className="flex gap-2">
                             {[1, 2, 3, 4, 5].map((star) => (
                                 <button
@@ -103,11 +103,11 @@ export default function CourseReviews({ courseId }: { courseId: string }) {
                         </div>
                     </div>
                     <div>
-                        <label className="block mb-2">Review</label>
+                        <label className="block mb-2 text-white">Review</label>
                         <textarea
                             value={formData.message}
                             onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                            className="w-full p-2 border rounded"
+                            className="w-full p-2 border rounded bg-gray-800 text-white"
                             rows={4}
                             required
                         />
@@ -138,7 +138,7 @@ export default function CourseReviews({ courseId }: { courseId: string }) {
                                     />
                                 ))}
                             </div>
-                            <p className="mt-2">{userReview.message}</p>
+                            <p className="mt-2 text-gray-200">{userReview.message}</p>
                         </div>
                         <div className="flex gap-2">
                             <button
@@ -166,7 +166,7 @@ export default function CourseReviews({ courseId }: { courseId: string }) {
 
             {/* Other Reviews */}
             <div className="space-y-4">
-                <h3 className="text-xl font-semibold">All Reviews</h3>
+                <h3 className="text-xl font-semibold text-white">All Reviews</h3>
                 {reviews
                     .filter(review => !review.isOwner)
                     .map((review) => (
@@ -183,7 +183,7 @@ export default function CourseReviews({ courseId }: { courseId: string }) {
                                     />
                                 ))}
                             </div>
-                            <p className="mt-2">{review.message}</p>
+                            <p className="mt-2 text-gray-200">{review.message}</p>
                         </div>
                     ))}
             </div>

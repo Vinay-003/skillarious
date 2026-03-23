@@ -21,7 +21,7 @@ export default function EducatorPage() {
     name: '',
     description: '',
     about: '',
-    price: 0, // Initialize as number
+    price: '',
     thumbnail: '',
     educatorId: '',
     start: new Date(),
@@ -116,9 +116,18 @@ export default function EducatorPage() {
       const educatorId = educatorResponse.data.id;
       
       // Validate price before submission
-      const price = parseFloat(formData.price.toString());
+      if (formData.price === '') {
+        toast.error('Please enter a valid price');
+        return;
+      }
+
+      const price = parseFloat(formData.price);
       if (isNaN(price)) {
         toast.error('Please enter a valid price');
+        return;
+      }
+      if (price < 0) {
+        toast.error('Price cannot be negative');
         return;
       }
 
@@ -178,7 +187,23 @@ export default function EducatorPage() {
       if (!selectedCourse) {
         throw new Error('No course selected for update');
       }
-      const response = await courseService.updateCourse(selectedCourse.id, formData);
+
+      const payload = {
+        ...formData,
+        price: formData.price === '' ? undefined : Number(formData.price)
+      };
+
+      if (payload.price !== undefined && Number.isNaN(payload.price)) {
+        toast.error('Please enter a valid price');
+        return;
+      }
+
+      if (payload.price !== undefined && payload.price < 0) {
+        toast.error('Price cannot be negative');
+        return;
+      }
+
+      const response = await courseService.updateCourse(selectedCourse.id, payload);
       setCourses(courses.map(course => course.id === selectedCourse.id ? response.course : course));
       setSelectedCourse(response.course);
       resetForm();
@@ -213,7 +238,7 @@ export default function EducatorPage() {
       name: '',
       description: '',
       about: '',
-      price: 0,
+      price: '',
       thumbnail: '',
       educatorId: '',
       start: new Date(),
@@ -228,11 +253,9 @@ export default function EducatorPage() {
     const { name, value } = e.target;
     
     if (name === 'price') {
-      // Ensure price is always a valid number
-      const numValue = parseFloat(value);
       setFormData(prev => ({
         ...prev,
-        [name]: isNaN(numValue) ? 0 : numValue
+        [name]: value
       }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
@@ -251,6 +274,7 @@ export default function EducatorPage() {
     setSelectedCourse(course);
     setFormData({
       ...course,
+      price: course.price?.toString() ?? '',
       start: new Date(course.start),
       end: new Date(course.end)
     });
@@ -322,6 +346,7 @@ export default function EducatorPage() {
                 min="0"
                 step="0.01"
                 className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg"
+                placeholder="0"
                 required
               />
             </div>
@@ -403,7 +428,7 @@ export default function EducatorPage() {
         </div>
 
         {/* Modules Section */}
-        <div className="mt-8">
+        <div className="mt-8 mb-8">
           <h2 className="text-xl font-semibold mb-4 text-white">Course Modules</h2>
           
           {/* Module List */}
@@ -509,7 +534,7 @@ export default function EducatorPage() {
         </div> */}
 
         {/* Courses List */}
-        <div className="space-y-4">
+        <div className="space-y-4 mt-6">
           {courses.map((course) => (
             <div key={course.id} className="bg-gray-700 rounded-lg overflow-hidden">
               {/* Thumbnail and basic info */}
@@ -580,12 +605,20 @@ export default function EducatorPage() {
                         <p className="text-white">{new Date(course.end).toLocaleDateString()}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => router.push(`/content/module/${course.id}`)}
-                      className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                    >
-                      View Modules
-                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                      <button
+                        onClick={() => router.push(`/content/module/${course.id}`)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      >
+                        View Modules
+                      </button>
+                      <button
+                        onClick={() => router.push(`/educator/doubts/${course.id}`)}
+                        className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+                      >
+                        View Module Doubts
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -596,6 +629,4 @@ export default function EducatorPage() {
     </div>
   );
 }
-
-
 

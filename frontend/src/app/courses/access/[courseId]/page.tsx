@@ -2,9 +2,8 @@
 
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import CourseReviews from '@/components/CourseReviews';
-import CourseDoubts from '@/components/CourseDoubts';
+import CourseModuleDoubts from '@/components/CourseModuleDoubts';
 import CourseContent from '@/components/CourseContent';
-import { useState } from 'react';
 
 interface PageProps {
   params: {
@@ -13,16 +12,14 @@ interface PageProps {
 }
 
 export default function CoursePage({ params }: PageProps) {
-  const [currentLesson, setCurrentLesson] = useState<{ id: string } | null>(null);
-
   return (
-    <Tabs defaultValue="content">
-      <TabsList>
-        <TabsTrigger value="content">Course Content</TabsTrigger>
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="doubts">Doubts</TabsTrigger>
-        <TabsTrigger value="reviews">Reviews</TabsTrigger>
-        <TabsTrigger value="notes">My Notes</TabsTrigger>
+    <Tabs defaultValue="content" className="space-y-4">
+      <TabsList className="bg-gray-800">
+        <TabsTrigger value="content" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">Course Content</TabsTrigger>
+        <TabsTrigger value="overview" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">Overview</TabsTrigger>
+        <TabsTrigger value="doubts" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">Doubts</TabsTrigger>
+        <TabsTrigger value="reviews" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">Reviews</TabsTrigger>
+        <TabsTrigger value="notes" className="data-[state=active]:bg-red-600 data-[state=active]:text-white">My Notes</TabsTrigger>
       </TabsList>
 
       <TabsContent value="content">
@@ -30,24 +27,22 @@ export default function CoursePage({ params }: PageProps) {
       </TabsContent>
 
       <TabsContent value="doubts">
-        <CourseDoubts 
-          courseId={String(params.courseId)} 
-          contentId={currentLesson?.id || ''} 
-        />
+        <h2 className="text-xl font-semibold text-white mb-4">Doubts</h2>
+        <CourseModuleDoubts courseId={String(params.courseId)} />
       </TabsContent>
 
       <TabsContent value="reviews">
+        <h2 className="text-xl font-semibold text-white mb-4">Reviews</h2>
         <CourseReviews courseId={String(params.courseId)} />
       </TabsContent>
 
       <TabsContent value="overview">
-        <div>Overview content here</div>
+        <div className="text-white font-semibold">Course Overview</div>
       </TabsContent>
 
       <TabsContent value="notes">
-        <div>Notes content here</div>
+        <div className="text-white font-semibold">My Notes</div>
       </TabsContent>
     </Tabs>
   );
 }
-

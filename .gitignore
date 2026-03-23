@@ -2,9 +2,9 @@
 node_modules/
 
 # Environment files
-.env
-.env.local
-.env.*.local
+# .env
+# .env.local
+# .env.*.local
 
 # Build outputs
 dist/
@@ -29,3 +29,6 @@ Thumbs.db
 
 # Testing
 **/coverage/
+
+# Accidental nested project copy
+backend/skillarious-final/

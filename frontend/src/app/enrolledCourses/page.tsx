@@ -22,11 +22,6 @@ export default function MyCoursesPage() {
       return;
     }
 
-    if (user.isEducator) {
-      router.push('/educator');
-      return;
-    }
-
     fetchEnrolledCourses();
   }, [user]);
 

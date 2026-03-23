@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Module } from '@/types';
 import ContentService from '@/services/content.service';
 import AuthService from '@/services/auth.service';
+import courseService from '@/services/course.service';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
@@ -20,6 +21,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null);
   const [isEducator, setIsEducator] = useState(false);
+  const [isCourseOwner, setIsCourseOwner] = useState(false);
 
   useEffect(() => {
     fetchModules();
@@ -31,9 +33,17 @@ export default function CourseContent({ courseId }: CourseContentProps) {
       const response = await AuthService.validateSession();
       const user = response.user;
       setIsEducator(user?.isEducator || false);
+
+      if (user?.isEducator) {
+        const ownership = await courseService.checkCourseOwnership(courseId);
+        setIsCourseOwner(Boolean(ownership?.isOwner));
+      } else {
+        setIsCourseOwner(false);
+      }
     } catch (error) {
       console.error('Error checking educator status:', error);
       setIsEducator(false);
+      setIsCourseOwner(false);
     }
   };
 
@@ -127,7 +137,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
                     }}
                     className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                   >
-                    {isEducator ? 'Manage Study Materials' : 'View Study Materials'}
+                    {isEducator && isCourseOwner ? 'Manage Study Materials' : 'View Study Materials'}
                   </button>
                   <button
                     onClick={(e) => {
@@ -136,9 +146,9 @@ export default function CourseContent({ courseId }: CourseContentProps) {
                     }}
                     className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                   >
-                    {isEducator ? 'Manage Videos' : 'View Videos'}
+                    {isEducator && isCourseOwner ? 'Manage Videos' : 'View Videos'}
                   </button>
-                  {isEducator && (
+                  {isEducator && isCourseOwner && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -160,7 +170,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
           No content available for this course yet.
         </div>
       )}
-      {isEducator && (
+      {isEducator && isCourseOwner && (
         <button
           onClick={() => router.push(`/educator/module/create/${courseId}`)}
           className="fixed bottom-4 right-4 bg-red-600 text-white p-4 rounded-full hover:bg-red-700"

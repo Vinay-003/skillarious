@@ -7,6 +7,7 @@ import { StudyMaterial } from '@/types';
 import { Loader2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MaterialViewer from '@/components/MaterialViewer';
+import ContentDoubtsThread from '@/components/ContentDoubtsThread';
 
 export default function StudyMaterialsPage({
   params
@@ -19,6 +20,7 @@ export default function StudyMaterialsPage({
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>([]);
   const [isEducator, setIsEducator] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<StudyMaterial | null>(null);
+  const [expandedDoubtMaterialId, setExpandedDoubtMaterialId] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -160,37 +162,53 @@ export default function StudyMaterialsPage({
           ) : (
             <div className="space-y-4">
               {studyMaterials.map((material) => (
-                <div
-                  key={material.id}
-                  className="bg-gray-700 rounded-lg p-4 flex justify-between items-center"
-                >
-                  <div>
-                    <h3 className="text-lg font-medium text-white">
-                      {material.title}
-                    </h3>
-                    {material.description && (
-                      <p className="text-sm text-gray-400 mt-1">
-                        {material.description}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedMaterial(material)}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                    >
-                      View Material
-                    </button>
-                    {isEducator && (
+                <div key={material.id} className="bg-gray-700 rounded-lg p-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-medium text-white">
+                        {material.title}
+                      </h3>
+                      {material.description && (
+                        <p className="text-sm text-gray-400 mt-1">
+                          {material.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleDeleteMaterial(material.id)}
-                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="Delete material"
+                        onClick={() => setSelectedMaterial(material)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                       >
-                        <Trash2 className="w-5 h-5" />
+                        View Material
                       </button>
-                    )}
+                      <button
+                        onClick={() =>
+                          setExpandedDoubtMaterialId((prev) => (prev === material.id ? null : material.id))
+                        }
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500"
+                      >
+                        {expandedDoubtMaterialId === material.id ? 'Hide Doubts' : 'Doubts'}
+                      </button>
+                      {isEducator && (
+                        <button
+                          onClick={() => handleDeleteMaterial(material.id)}
+                          className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="Delete material"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {expandedDoubtMaterialId === material.id && (
+                    <ContentDoubtsThread
+                      contentId={material.id}
+                      contentLabel={material.title}
+                      allowAsk={!isEducator}
+                      canReply={isEducator}
+                    />
+                  )}
                 </div>
               ))}
             </div>

@@ -20,11 +20,21 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [averageRating, setAverageRating] = useState<number | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
 
   useEffect(() => {
     fetchCourse();
     fetchAverageRating();
   }, [params.courseId]);
+
+  useEffect(() => {
+    if (!user) {
+      setIsEnrolled(false);
+      return;
+    }
+
+    checkEnrollmentStatus();
+  }, [user, params.courseId]);
 
   const fetchCourse = async () => {
     try {
@@ -43,9 +53,19 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
   const fetchAverageRating = async () => {
     try {
       const response = await reviewService.getAverageRating(params.courseId);
-      setAverageRating(response.averageRating);
+      const normalizedRating = Number(response?.averageRating);
+      setAverageRating(Number.isFinite(normalizedRating) ? normalizedRating : null);
     } catch (error) {
       console.error('Error fetching average rating:', error);
+    }
+  };
+
+  const checkEnrollmentStatus = async () => {
+    try {
+      const response = await courseService.checkCourseAccess(params.courseId);
+      setIsEnrolled(Boolean(response?.hasAccess));
+    } catch {
+      setIsEnrolled(false);
     }
   };
 
@@ -55,16 +75,53 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
       router.push('/login');
       return;
     }
+
+    if (Number(course?.price) === 0) {
+      handleFreeEnroll();
+      return;
+    }
+
     // Open the payment modal instead of redirecting
     setShowPaymentModal(true);
   };
 
+  const handleFreeEnroll = async () => {
+    if (!course) return;
+
+    setProcessingPayment(true);
+    try {
+      const response = await courseService.purchaseCourse(course.id);
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to enroll in free course');
+      }
+      setIsEnrolled(true);
+      toast.success('Course added to My Courses');
+      router.push(`/courses/access/${course.id}`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error.message || 'Failed to enroll in free course');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
   const handlePaymentSuccess = () => {
+    setIsEnrolled(true);
     toast.success('Course purchased successfully!');
     router.push(`/courses/access/${course?.id}`);
   };
 
   const renderPurchaseButton = () => {
+    if (isEnrolled) {
+      return (
+        <button
+          disabled
+          className="w-half bg-green-700 text-white py-2 px-4 rounded-md cursor-not-allowed"
+        >
+          Enrolled
+        </button>
+      );
+    }
+
     if (processingPayment) {
       return (
         <button 
@@ -82,7 +139,7 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
         onClick={handlePurchaseClick}
         className="w-half bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors duration-200"
       >
-        Buy
+        {Number(course?.price) === 0 ? 'Add To My Courses' : 'Buy'}
       </button>
     );
   };
@@ -109,7 +166,7 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-8 text-white">Course Details</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8">
           {/* Left Column - Course Image and Basic Info */}
           <FollowerPointerCard>
             <div className="relative w-full h-full flex flex-col bg-gray-800 rounded-lg p-6">
@@ -127,7 +184,9 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
                   {course?.name}
                 </h3>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-lg text-white">₹{course?.price}</span>
+                  <span className="text-lg text-white">
+                    {Number(course?.price) === 0 ? 'Free' : `₹${course?.price}`}
+                  </span>
                   {renderPurchaseButton()}
                 </div>
               </div>
@@ -164,7 +223,9 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-gray-400">Rating</h4>
-                  <p className="text-white">{averageRating?.toFixed(1) || 'Not rated'}</p>
+                  <p className="text-white">
+                    {typeof averageRating === 'number' ? averageRating.toFixed(1) : 'Not rated'}
+                  </p>
                 </div>
               </div>
             </div>

@@ -37,25 +37,25 @@ const testimonials = [
     name: "Sarah Johnson",
     role: "Software Engineer",
     text: "The course content is incredibly well-structured and practical. I've learned so much!",
-    avatar: "/avatars/avatar-1.png" // Use local images in public/avatars/
+    avatar: "/testimonials/avatar1.jpg"
   },
   {
     name: "Michael Chen",
     role: "Data Scientist",
     text: "The hands-on projects really helped me understand complex concepts better.",
-    avatar: "/avatars/avatar-2.png"
+    avatar: "/testimonials/avatar2.jpg"
   },
   {
     name: "Emily Rodriguez",
     role: "Web Developer",
     text: "Great community and support. The instructors are very responsive.",
-    avatar: "/avatars/avatar-3.png"
+    avatar: "/testimonials/avatar3.jpg"
   },
   {
     name: "David Kim",
     role: "Student",
     text: "Perfect for beginners! The pace is just right and explanations are clear.",
-    avatar: "/avatars/avatar-4.png"
+    avatar: "/testimonials/avatar1.jpg"
   }
 ];
 
@@ -85,6 +85,7 @@ const LearnerAvatar = ({ name, image }: { name: string; image: string }) => (
         src={image}
         alt={name}
         fill
+        sizes="96px"
         className="rounded-full object-cover"
       />
       <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-green-500 rounded-full border-3 border-[#1E1E1E]" />
@@ -95,11 +96,11 @@ const LearnerAvatar = ({ name, image }: { name: string; image: string }) => (
 
 const FloatingLearners = () => {
   const learners = [
-    { name: "Prajwal Shah", image: "https://avatar.iran.liara.run/public/boy?username=prajwal" },
-    { name: "K Sanketh Kumar", image: "https://avatar.iran.liara.run/public/boy?username=sanketh" },
-    { name: "Sankalp Jain", image: "https://avatar.iran.liara.run/public/boy?username=sankalp" },
-    { name: "Anubhuti Pandey", image: "https://avatar.iran.liara.run/public/girl?username=anubhuti" },
-    { name: "Sudipta B", image: "https://avatar.iran.liara.run/public/boy?username=sudipta" },
+    { name: "Prajwal Shah", image: "/testimonials/avatar1.jpg" },
+    { name: "K Sanketh Kumar", image: "/testimonials/avatar2.jpg" },
+    { name: "Sankalp Jain", image: "/testimonials/avatar3.jpg" },
+    { name: "Anubhuti Pandey", image: "/instructor-profile.jpg" },
+    { name: "Sudipta B", image: "/testimonials/avatar2.jpg" },
   ];
 
   return (
@@ -164,32 +165,31 @@ export default function HomePage() {
     {
       name: 'Prajwal Shah',
       company: 'Deutsche Bank',
-      // Using avatar.iran.liara.run for placeholder avatars
-      image: 'https://avatar.iran.liara.run/public/boy?username=prajwal',
+      image: '/testimonials/avatar1.jpg',
       companyLogo: '/companies/deutsche-bank.svg'
     },
     {
       name: 'K Sanketh Kumar',
       company: 'EA Sports',
-      image: 'https://avatar.iran.liara.run/public/boy?username=sanketh',
+      image: '/testimonials/avatar2.jpg',
       companyLogo: '/companies/ea.svg'
     },
     {
       name: 'Sankalp Jain',
       company: 'Samsung',
-      image: 'https://avatar.iran.liara.run/public/boy?username=sankalp',
+      image: '/testimonials/avatar3.jpg',
       companyLogo: '/companies/samsung.svg'
     },
     {
       name: 'Anubhuti Pandey',
       company: 'Google',
-      image: 'https://avatar.iran.liara.run/public/girl?username=anubhuti',
+      image: '/instructor-profile.jpg',
       companyLogo: '/companies/google.svg'
     },
     {
       name: 'Sudipta B',
       company: 'Amazon',
-      image: 'https://avatar.iran.liara.run/public/boy?username=sudipta',
+      image: '/testimonials/avatar2.jpg',
       companyLogo: '/companies/amazon.svg'
     },
   ];
@@ -291,7 +291,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen bg-black">
       {/* Hero Section */}
-      <section className="pt-32 pb-16 relative h-screen">
+      <section className="pt-32 pb-8 relative">
         <motion.div 
           initial="hidden"
           animate="visible"
@@ -577,7 +577,7 @@ export default function HomePage() {
                     y: useTransform(
                       smoothProgress,
                       [0, 1],
-                      [0, -100 * (index + 1)]
+                      [0, index % 2 === 0 ? -20 : 20]
                     ),
                     x: useTransform(
                       smoothProgress,
@@ -736,10 +736,6 @@ export default function HomePage() {
 //     </motion.div>
 //   );
 // };
-
-
-
-
 
 
 

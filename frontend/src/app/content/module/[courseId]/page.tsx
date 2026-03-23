@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import ContentService from '@/services/content.service';
+import courseService from '@/services/course.service';
 import { Module } from '@/types';
 import { Loader2, Plus, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -20,6 +21,7 @@ export default function ModulePage({
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isEducator, setIsEducator] = useState(false);
+  const [isCourseOwner, setIsCourseOwner] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     duration: '',
@@ -38,9 +40,17 @@ export default function ModulePage({
       const response = await AuthService.validateSession();
       const user = response.user;
       setIsEducator(user?.isEducator || false);
+
+      if (user?.isEducator && params.courseId) {
+        const ownership = await courseService.checkCourseOwnership(params.courseId);
+        setIsCourseOwner(Boolean(ownership?.isOwner));
+      } else {
+        setIsCourseOwner(false);
+      }
     } catch (error) {
       console.error('Error checking educator status:', error);
       setIsEducator(false);
+      setIsCourseOwner(false);
     }
   };
 
@@ -98,6 +108,11 @@ export default function ModulePage({
 
   const handleCreateModule = async () => {
     try {
+      if (!isCourseOwner) {
+        toast.error('Only course owner can create modules');
+        return;
+      }
+
       if (!params.courseId) {
         toast.error('Course ID is required');
         return;
@@ -130,6 +145,11 @@ export default function ModulePage({
 
   const handleUpdateModule = async () => {
     try {
+      if (!isCourseOwner) {
+        toast.error('Only course owner can update modules');
+        return;
+      }
+
       if (!selectedModule) {
         toast.error('No module selected for update');
         return;
@@ -164,6 +184,11 @@ export default function ModulePage({
 
   const handleDeleteModule = async (moduleId: string) => {
     try {
+      if (!isCourseOwner) {
+        toast.error('Only course owner can delete modules');
+        return;
+      }
+
       if (!moduleId) {
         toast.error('Module ID is required');
         return;
@@ -216,7 +241,7 @@ export default function ModulePage({
         <h1 className="text-3xl font-bold mb-8 text-white">Course Modules</h1>
 
         {/* Form Section */}
-        {isEducator && (
+        {isEducator && isCourseOwner && (
           <div className="bg-gray-800 rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4 text-white">
               {selectedModule ? 'Edit Module' : 'Create New Module'}
@@ -329,26 +354,28 @@ export default function ModulePage({
                           Duration: {module.duration}h | Videos: {module.videoCount} | Materials: {module.materialCount}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            selectModuleForEdit(module);
-                          }}
-                          className="p-2 text-gray-400 hover:text-white"
-                        >
-                          <Pencil className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteModule(module.id);
-                          }}
-                          className="p-2 text-gray-400 hover:text-red-500"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
+                      {isEducator && isCourseOwner && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              selectModuleForEdit(module);
+                            }}
+                            className="p-2 text-gray-400 hover:text-white"
+                          >
+                            <Pencil className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteModule(module.id);
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
