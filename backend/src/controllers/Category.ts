@@ -3,6 +3,18 @@ import { db } from '../db/index.ts';
 import { categoryTable, usersTable } from '../db/schema.ts';
 import { sql, eq } from 'drizzle-orm';
 
+const isDbUnavailableError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as { code?: string; message?: string };
+  return (
+    err.code === 'ENETUNREACH' ||
+    err.code === 'ECONNREFUSED' ||
+    err.code === 'ETIMEDOUT' ||
+    err.code === '57P01' ||
+    (typeof err.message === 'string' && err.message.toLowerCase().includes('connect enetunreach'))
+  );
+};
+
 interface AuthenticatedRequest extends Request {
   user: {
     id: string;
@@ -130,6 +142,15 @@ export const getAllCategories = async (req: Request, res: Response) => {
       data: categories
     });
   } catch (error) {
+    if (isDbUnavailableError(error)) {
+      return res.status(503).json({
+        success: false,
+        message: 'Database unavailable. Check backend DATABASE_URL or use a Supabase pooler IPv4 URL.',
+        data: []
+      });
+    }
+
+    console.error('getAllCategories error:', error);
     return res.status(500).json({
       success: false,
       message: 'Error fetching categories'
@@ -173,5 +194,4 @@ export const getCategoryBySearch = async (req: Request, res: Response) => {
     });
   }
 };
-
 

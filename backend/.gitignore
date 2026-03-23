@@ -1,4 +1,4 @@
-.env.*
+# .env.*
 # Node modulesnode_modules/
 node_modules/
 
@@ -11,8 +11,8 @@ logs/*.log
 # IDE/Editor folders
 .vscode/
 .idea# Environment variables
-.env
-.env.local.env.*.local
+# .env
+# .env.local.env.*.local
 # Dependency lock files
 package-lock.jsonyarn.lock
 # Testing

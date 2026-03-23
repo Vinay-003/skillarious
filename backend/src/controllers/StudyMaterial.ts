@@ -194,8 +194,7 @@ export const updateStudyMaterial = async (req: AuthenticatedRequest, res: Respon
 
         // Delete old file if exists
         if (existingMaterial[0].material.fileUrl) {
-          const oldPublicId = existingMaterial[0].material.fileUrl.split('/').slice(-1)[0].split('.')[0];
-          await deleteMedia(oldPublicId);
+          await deleteMedia(existingMaterial[0].material.fileUrl);
         }
       } catch (uploadError) {
         return res.status(500).json({

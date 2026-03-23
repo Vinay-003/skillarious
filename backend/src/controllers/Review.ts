@@ -206,11 +206,15 @@ export const getAverageRating = async (req: Request, res: Response) => {
             .from(reviewsTable)
             .where(eq(reviewsTable.courseId, courseId));
 
-        const averageRating = result[0]?.averageRating || 0;
+        const rawAverage = result[0]?.averageRating;
+        const averageRating =
+            rawAverage === null || rawAverage === undefined
+                ? 0
+                : Number(rawAverage);
 
         return res.status(200).json({
             success: true,
-            averageRating
+            averageRating: Number.isFinite(averageRating) ? averageRating : 0
         });
     } catch (error) {
         console.error('Error fetching average rating:', error);
@@ -297,7 +301,6 @@ export const deleteReview = async (req: AuthenticatedRequest, res: Response) => 
         });
     }
 };
-
 
 
 

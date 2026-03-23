@@ -12,6 +12,7 @@ import fileUpload from 'express-fileupload';
 import userRoutes from "./src/routes/user.ts";
 import studentRoute from "./src/routes/student.ts";
 import cookieParser from "cookie-parser";
+import path from 'path';
 
 const app = express();
 dotenv.config();
@@ -29,6 +30,11 @@ app.use(fileUpload({
   tempFileDir: '/tmp/'
 }));
 app.use(cookieParser());
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/auth", authRoute);
 app.use("/api/v1/otp", otpRoute);

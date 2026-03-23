@@ -40,11 +40,19 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response): Pr
       });
     }
 
-    if(!name || !description  || !price || !about ){
+    if (name == null || description == null || about == null || price == null || price === '') {
         return res.status(400).json({
             success: false,
             message: 'Required fields are missing'
         });
+    }
+
+    const parsedPrice = Number(price);
+    if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Price must be a valid non-negative number'
+      });
     }
     const isEducator = await db.select().from(usersTable).where(eq(usersTable.id, userId)).then((data) => data[0].isEducator);
     if(!isEducator){
@@ -59,7 +67,7 @@ export const createCourse = async (req: AuthenticatedRequest, res: Response): Pr
         description,
         about,
         educatorId,
-        price: price.toString(), // Store as string
+        price: parsedPrice.toString(), // Store as string
         comments: "",
         start: new Date(),
         end: new Date(),
@@ -128,7 +136,16 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response): Pr
     if (name) updateData.name = name;
     if (description) updateData.description = description;
     if (about) updateData.about = about;
-    if (price) updateData.price = price.toString();
+    if (price !== undefined && price !== null && price !== '') {
+      const parsedPrice = Number(price);
+      if (Number.isNaN(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Price must be a valid non-negative number'
+        });
+      }
+      updateData.price = parsedPrice.toString();
+    }
 
     // Only perform update if there are fields to update
     if (Object.keys(updateData).length === 0) {
@@ -259,10 +276,11 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
           rating: coursesTable.thumbnail,
           price: coursesTable.price,
           educatorId: coursesTable.educatorId,
-          educatorName: educatorsTable.id, // Fetching educator id for now (Can join to get name if needed)
+          educatorName: usersTable.name,
         })
         .from(coursesTable)
         .leftJoin(educatorsTable, eq(coursesTable.educatorId, educatorsTable.id))
+        .leftJoin(usersTable, eq(educatorsTable.userId, usersTable.id))
         .where(eq(coursesTable.id, id));
   
       if (!course.length) {
@@ -538,6 +556,37 @@ export const purchaseCourse = async (req: AuthenticatedRequest, res: Response): 
   try {
     const { id: userId } = req.user;
     const { courseId } = req.params;
+
+    const [course] = await db
+      .select({
+        id: coursesTable.id,
+        price: coursesTable.price
+      })
+      .from(coursesTable)
+      .where(eq(coursesTable.id, courseId))
+      .limit(1);
+
+    if (!course) {
+      return res.status(404).json({
+        success: false,
+        message: 'Course not found'
+      });
+    }
+
+    if (Number(course.price) !== 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only free courses can be enrolled directly'
+      });
+    }
+
+    const alreadyEnrolled = await isUserEnrolled(userId, courseId);
+    if (alreadyEnrolled) {
+      return res.status(200).json({
+        success: true,
+        message: 'Course already in your My Courses list'
+      });
+    }
 
     // Create transaction record
     await db.insert(transactionsTable).values({

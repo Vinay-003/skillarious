@@ -96,10 +96,21 @@ export const getEducatorProfile = async (req: AuthenticatedRequest, res: Respons
       .from(educatorsTable)
       .where(eq(educatorsTable.userId, userId));
 
+    // Backfill missing educator row for users already flagged as educators.
+    // This prevents 404s in old/inconsistent data states.
     if (!educator.length) {
-      return res.status(404).json({
-        success: false,
-        message: 'Educator profile not found'
+      const [createdEducator] = await db.insert(educatorsTable)
+        .values({
+          userId,
+          bio: null,
+          about: null,
+          doubtOpen: false
+        })
+        .returning();
+
+      return res.status(200).json({
+        success: true,
+        data: createdEducator
       });
     }
 

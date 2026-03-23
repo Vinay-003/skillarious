@@ -10,6 +10,7 @@ import reviewRoute from "./routes/review.ts";
 import educatorRoute from "./routes/educator.ts";
 import contentRoute from "./routes/content.ts";
 import fileUpload from 'express-fileupload';
+import path from 'path';
 // import { setupCategoryTriggers } from './db/setupTriggers.ts';
 
 config();
@@ -41,6 +42,7 @@ app.use(fileUpload({
   useTempFiles: true,
   tempFileDir: '/tmp/'
 }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Routes
 

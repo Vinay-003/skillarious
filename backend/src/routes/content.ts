@@ -1,6 +1,6 @@
 import express from 'express';
 import { RequestHandler } from 'express';
-import { createDoubt, replyToDoubt, getRealtimeStatus } from '../controllers/Doubt.ts';
+import { createDoubt, replyToDoubt, getRealtimeStatus, getDoubtsByContent, getDoubts, getDoubtDetails } from '../controllers/Doubt.ts';
 import { createModule, updateModule, deleteModule, getAllModules } from '../controllers/Module.ts';
 import { uploadStudyMaterial, updateStudyMaterial, deleteStudyMaterial, getModuleStudyMaterials } from '../controllers/StudyMaterial.ts';
 import { createCategory, updateCategory, deleteCategory, getAllCategories, getCategoryBySearch } from '../controllers/Category.ts';
@@ -19,6 +19,9 @@ const router = express.Router();
 // Doubts related routes
 router.post('/createDoubt', authenticateUser as unknown as RequestHandler, createDoubt as unknown as RequestHandler);
 router.post('/replyToDoubt/:id', authenticateUser as unknown as RequestHandler, replyToDoubt as unknown as RequestHandler);
+router.get('/doubts/content/:contentId', authenticateUser as unknown as RequestHandler, getDoubtsByContent as unknown as RequestHandler);
+router.get('/doubts/:id', authenticateUser as unknown as RequestHandler, getDoubtDetails as unknown as RequestHandler);
+router.get('/doubts', authenticateUser as unknown as RequestHandler, getDoubts as unknown as RequestHandler);
 
 // New route for realtime status
 router.get('/realtime-status', getRealtimeStatus as unknown as RequestHandler);
@@ -50,7 +53,6 @@ router.put('/updateClass/:contentId', authenticateUser as unknown as RequestHand
 router.delete('/deleteClass/:contentId', authenticateUser as unknown as RequestHandler, deleteClass as unknown as RequestHandler);
 
 export default router;
-
 
 
 

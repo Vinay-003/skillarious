@@ -59,15 +59,29 @@ export const createModule = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
+    const educatorProfile = await db
+      .select({ id: educatorsTable.id })
+      .from(educatorsTable)
+      .where(eq(educatorsTable.userId, id))
+      .limit(1);
+
+    if (!educatorProfile.length) {
+      res.status(403).json({
+        success: false,
+        message: 'Educator profile not found'
+      });
+      return;
+    }
+
     // Verify the course belongs to this educator
     const courseOwnership = await db
-      .select()
+      .select({ id: coursesTable.id })
       .from(coursesTable)
-      .innerJoin(educatorsTable, eq(coursesTable.educatorId, educatorsTable.id))
       .where(and(
         eq(coursesTable.id, courseId),
-        eq(educatorsTable.userId, id)
-      ));
+        eq(coursesTable.educatorId, educatorProfile[0].id)
+      ))
+      .limit(1);
 
     if (!courseOwnership.length) {
       res.status(403).json({

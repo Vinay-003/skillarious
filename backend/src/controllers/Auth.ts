@@ -6,11 +6,22 @@ import bcrypt from "bcrypt";
 import jwt, { verify } from "jsonwebtoken";
 import { NextFunction, Request, Response } from "express";
 import {generateAccessToken, generateRefreshToken} from "../utils/generateToken.ts";
-import { generateOtp, verifyOtp } from "./Otp.ts";
 
 interface AuthenticatedRequest extends Request {
   user?: any;
 }
+
+const isDbUnavailableError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as { code?: string; message?: string };
+  return (
+    err.code === 'ENETUNREACH' ||
+    err.code === 'ECONNREFUSED' ||
+    err.code === 'ETIMEDOUT' ||
+    err.code === '57P01' ||
+    (typeof err.message === 'string' && err.message.toLowerCase().includes('connect enetunreach'))
+  );
+};
 
 config({path: ".env.local"});
 
@@ -51,36 +62,19 @@ export const signUp = async (req: Request,res:Response) => {
     name,
     email,
     password: hashedPassword,
-    verified: false ,
+    verified: true ,
    }).returning();
-
-   const response  = await fetch(`${process.env.HOST_URL}/api/v1/otp/generate`,
-    {
-        method: "post",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-    });
-
-    const data = await response.json();
-
-    if(!data.success) {
-      res.status(200).json({
-        success: false,
-        message: data.message
-      });
-      return;
-    }
 
    //  response
     res.status(200).json({
       success: true,
-      message: "User registered successfully. Please check your email for verification code.",
+      message: "User registered successfully.",
       user: {
         name: newUser[0].name,
         email: newUser[0].email,
-        verified: false
+        verified: true
       },
-      requiresVerification: true
+      requiresVerification: false
     });
     return;
    }catch(error){
@@ -97,7 +91,6 @@ export const signUp = async (req: Request,res:Response) => {
 export const login = async (req: Request, res: Response) => {
     try{
     const {email,password} = req.body;
-    console.log(email, password)
     
     if(!email || !password){
          res.status(400).json({
@@ -136,6 +129,14 @@ export const login = async (req: Request, res: Response) => {
 
     }catch(error){
      console.log(error);
+      if (isDbUnavailableError(error)) {
+        res.status(503).json({
+          success: false,
+          message: "Database unavailable. Check backend DATABASE_URL or use a Supabase pooler IPv4 URL."
+        });
+        return;
+      }
+
       res.status(500).json({
         success: false,
         message: "Internal Server error"
