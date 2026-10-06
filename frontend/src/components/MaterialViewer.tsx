@@ -2,15 +2,18 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { resolveMediaUrl } from '@/utils/mediaUrl';
+import LearningAssistant from '@/components/LearningAssistant';
 
 interface MaterialViewerProps {
     fileUrl: string;
     fileType: string;
     title: string;
     onClose: () => void;
+    contentId?: string;
+    courseId?: string;
 }
 
-export default function MaterialViewer({ fileUrl, fileType, title, onClose }: MaterialViewerProps) {
+export default function MaterialViewer({ fileUrl, fileType, title, onClose, contentId, courseId }: MaterialViewerProps) {
     const [loading, setLoading] = useState(true);
     const resolvedUrl = resolveMediaUrl(fileUrl);
 
@@ -21,7 +24,8 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
             return (
                 <iframe
                     src={`${resolvedUrl}#view=fit`}
-                    className="w-full h-[80vh]"
+                    title={title}
+                    className="w-full h-[55vh]"
                     onLoad={() => setLoading(false)}
                 />
             );
@@ -75,12 +79,13 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-lg w-full max-w-4xl mx-4">
-                <div className="flex justify-between items-center p-4 border-b border-gray-700">
-                    <h3 className="text-xl font-semibold text-white">{title}</h3>
+            <div className="studio-card w-full max-w-4xl mx-4 max-h-[95vh] overflow-y-auto" role="dialog" aria-modal="true" aria-label={title}>
+                <div className="flex justify-between items-center p-4 border-b border-[var(--line)]">
+                    <h3 className="text-xl">{title}</h3>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-700 rounded-full transition-colors"
+                        aria-label="Close material viewer"
+                        className="p-2 rounded-full transition-colors"
                     >
                         <X className="w-6 h-6 text-gray-400" />
                     </button>
@@ -88,11 +93,12 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose }: Ma
                 
                 <div className="p-4">
                     {loading && (
-                        <div className="flex justify-center items-center h-[80vh]">
+                        <div className="flex justify-center items-center h-12" role="status" aria-label="Loading material">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
                         </div>
                     )}
                     {renderContent()}
+                    {contentId && <div className="mt-6"><LearningAssistant contentId={contentId} courseId={courseId} title={`Ask about ${title}`} /></div>}
                 </div>
             </div>
         </div>

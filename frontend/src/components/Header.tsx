@@ -1,237 +1,37 @@
 'use client';
-
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Menu, Search, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, X, Search, Sun, Moon, Monitor, ArrowUpRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
+type Theme = 'light' | 'dark' | 'system';
+const links = [{ href: '/courses', label: 'Explore courses' }, { href: '/doubts', label: 'Questions' }, { href: '/dashboard', label: 'My studio' }];
 export default function Header() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const pathname = usePathname();
   const router = useRouter();
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
-
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [theme, setTheme] = useState<Theme>('system');
+  useEffect(() => { try { const saved = localStorage.getItem('skillarious-theme'); setTheme(saved === 'light' || saved === 'dark' ? saved : 'system'); } catch { /* Use system appearance when storage is blocked. */ } }, []);
+  useEffect(() => { setOpen(false); }, [pathname]);
   useEffect(() => {
-    const handleOutsideClick = (event: MouseEvent) => {
-      if (!profileMenuRef.current) return;
-      if (!profileMenuRef.current.contains(event.target as Node)) {
-        setIsProfileMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (!q) return;
-
-    setIsMobileMenuOpen(false);
-    router.push(`/search?q=${encodeURIComponent(q)}`);
-  };
-
-  const handleLogout = () => {
-    setIsProfileMenuOpen(false);
-    setIsMobileMenuOpen(false);
-    router.push('/logout');
-    router.refresh();
-  };
-
-  const accountLinks = (
-    <>
-      <Link
-        href="/profile"
-        className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
-        onClick={() => {
-          setIsProfileMenuOpen(false);
-          setIsMobileMenuOpen(false);
-        }}
-      >
-        Profile
-      </Link>
-      {user?.isEducator ? (
-        <>
-          <Link
-            href="/educator"
-            className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
-            onClick={() => {
-              setIsProfileMenuOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            Courses Taught
-          </Link>
-          <Link
-            href="/enrolledCourses"
-            className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
-            onClick={() => {
-              setIsProfileMenuOpen(false);
-              setIsMobileMenuOpen(false);
-            }}
-          >
-            My Courses
-          </Link>
-        </>
-      ) : (
-        <Link
-          href="/enrolledCourses"
-          className="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
-          onClick={() => {
-            setIsProfileMenuOpen(false);
-            setIsMobileMenuOpen(false);
-          }}
-        >
-          My Courses
-        </Link>
-      )}
-      <button
-        onClick={handleLogout}
-        className="block w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700"
-      >
-        Logout
-      </button>
-    </>
-  );
-
-  return (
-    <nav className="fixed z-50 w-full border-b border-gray-800 bg-black/60 backdrop-blur-sm">
-      <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="flex items-center space-x-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-sm bg-gray-700 text-xl font-bold text-white/90">LS</div>
-          <span className="font-semibold text-white">Learn Sphere</span>
-        </Link>
-
-        <form onSubmit={handleSearch} className="relative hidden max-w-2xl flex-1 md:block">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search courses and categories..."
-            className="w-full rounded-lg bg-gray-800 px-4 py-2 pr-20 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute right-10 top-2.5 text-gray-400 hover:text-white"
-              aria-label="Clear search"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-          <button
-            type="submit"
-            className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
-            aria-label="Submit search"
-          >
-            <Search className="h-5 w-5" />
-          </button>
-        </form>
-
-        <div className="hidden items-center gap-4 md:flex">
-          {user?.isEducator && (
-            <Link href="/profile" className="text-white hover:text-gray-300">
-              Educator Profile
-            </Link>
-          )}
-
-          {user ? (
-            <div className="relative" ref={profileMenuRef}>
-              <button
-                type="button"
-                onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                className="rounded-full bg-[#FF6B6B] px-4 py-2 text-white transition-colors hover:bg-[#FF5252]"
-                aria-haspopup="menu"
-                aria-expanded={isProfileMenuOpen}
-                aria-label="Account menu"
-              >
-                {user.email[0].toUpperCase()}
-              </button>
-
-              {isProfileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg bg-gray-800 py-2 shadow-lg" role="menu">
-                  {accountLinks}
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link href="/login" className="rounded-md bg-[#FF6B6B] px-4 py-2 text-white transition-colors hover:bg-[#FF5252]">
-              Login
-            </Link>
-          )}
-        </div>
-
-        <button
-          type="button"
-          className="text-white md:hidden"
-          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-          aria-label="Toggle mobile menu"
-          aria-expanded={isMobileMenuOpen}
-        >
-          {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-        </button>
-      </div>
-
-      {isMobileMenuOpen && (
-        <div className="border-t border-gray-800 bg-gray-900 px-4 pb-4 pt-3 md:hidden">
-          <form onSubmit={handleSearch} className="relative mb-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search courses and categories..."
-              className="w-full rounded-lg bg-gray-800 px-4 py-2 pr-20 text-white focus:outline-none focus:ring-2 focus:ring-red-600"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-10 top-2.5 text-gray-400 hover:text-white"
-                aria-label="Clear search"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-            <button
-              type="submit"
-              className="absolute right-3 top-2.5 text-gray-400 hover:text-white"
-              aria-label="Submit search"
-            >
-              <Search className="h-5 w-5" />
-            </button>
-          </form>
-
-          <div className="space-y-2">
-            <Link href="/" className="block rounded-md px-3 py-2 text-white hover:bg-gray-800" onClick={() => setIsMobileMenuOpen(false)}>
-              Home
-            </Link>
-
-            {user?.isEducator && (
-              <Link href="/profile" className="block rounded-md px-3 py-2 text-white hover:bg-gray-800" onClick={() => setIsMobileMenuOpen(false)}>
-                Educator Profile
-              </Link>
-            )}
-
-            {user ? (
-              <div className="rounded-md border border-gray-700 py-1">{accountLinks}</div>
-            ) : (
-              <Link
-                href="/login"
-                className="block rounded-md bg-[#FF6B6B] px-3 py-2 text-center text-white hover:bg-[#FF5252]"
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                Login
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </nav>
-  );
+    if (document.documentElement.dataset.theme !== theme) return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && media.matches));
+    apply(); media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [theme]);
+  const changeTheme = (next: Theme) => { try { localStorage.setItem('skillarious-theme', next); } catch { /* Keep in-memory preference. */ } document.documentElement.dataset.theme = next; setTheme(next); };
+  const signOut = async () => { setOpen(false); const pending = logout(); router.replace('/login'); await pending; };
+  const submit = (event: React.FormEvent) => { event.preventDefault(); if (search.trim()) { router.push(`/search?q=${encodeURIComponent(search.trim())}`); setOpen(false); } };
+  return <header className="site-header"><div className="shell header-inner">
+    <Link href="/" className="brand" aria-label="Skillarious home"><span className="brand-mark">s<span>.</span></span><span>skillarious</span></Link>
+    <nav className="desktop-nav" aria-label="Main navigation">{links.map(link => <Link key={link.href} href={link.href} aria-current={pathname === link.href ? 'page' : undefined}>{link.label}</Link>)}</nav>
+    <div className="header-actions"><form className="header-search" role="search" onSubmit={submit}><label className="sr-only" htmlFor="site-search">Search courses</label><input id="site-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search lessons…" /><button aria-label="Search" type="submit"><Search size={18}/></button></form>
+    <div className="theme-control" role="group" aria-label="Appearance"><button type="button" aria-label="Light theme" aria-pressed={theme === 'light'} onClick={() => changeTheme('light')}><Sun size={16}/></button><button type="button" aria-label="Dark theme" aria-pressed={theme === 'dark'} onClick={() => changeTheme('dark')}><Moon size={16}/></button><button type="button" aria-label="System theme" aria-pressed={theme === 'system'} onClick={() => changeTheme('system')}><Monitor size={16}/></button></div>
+    <Link className="header-account" href={user ? '/profile' : '/login'}>{user ? 'Account' : 'Sign in'} <ArrowUpRight size={15}/></Link>{user && <button className="header-account" type="button" onClick={signOut}>Sign out</button>}<button className="mobile-toggle" type="button" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} aria-controls="mobile-menu" onClick={() => setOpen(!open)}>{open ? <X/> : <Menu/>}</button></div></div>
+    {open && <nav id="mobile-menu" className="mobile-nav" aria-label="Mobile navigation"><div className="shell"><form role="search" onSubmit={submit}><label htmlFor="mobile-search">Find something to learn</label><div className="mobile-search-row"><input id="mobile-search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search courses"/><button type="submit" aria-label="Search"><Search size={19}/></button></div></form>{links.map(link => <Link href={link.href} key={link.href}>{link.label} <ArrowUpRight size={16}/></Link>)}{user?.isEducator && <Link href="/educator">Educator workspace <ArrowUpRight size={16}/></Link>}{user?.isAdmin && <Link href="/admin/dashboard">Administration <ArrowUpRight size={16}/></Link>}<Link href={user ? '/profile' : '/login'}>{user ? 'Your account' : 'Sign in'} <ArrowUpRight size={16}/></Link>{user && <button type="button" onClick={signOut}>Sign out <ArrowUpRight size={16}/></button>}</div></nav>}
+  </header>;
 }

@@ -154,8 +154,8 @@ export default function EducatorPage() {
 
       if (response.success && modules.length > 0) {
         // Create modules for the new course
-        for (const module of modules) {
-          await contentService.createModule(response.courseId, module);
+        for (const courseModule of modules) {
+          await contentService.createModule(response.courseId, courseModule);
         }
       }
 
@@ -629,4 +629,3 @@ export default function EducatorPage() {
     </div>
   );
 }
-

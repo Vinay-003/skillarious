@@ -10,20 +10,29 @@ interface AuthResponse {
 }
 
 class AuthService {
+  private refreshInFlight: Promise<AuthResponse> | null = null;
+  private sessionGeneration = 0;
+
+  getSessionGeneration() { return this.sessionGeneration; }
+
+  isInvalidRefresh(error: unknown) {
+    return axios.isAxiosError(error) && [401, 403, 404].includes(error.response?.status ?? 0);
+  }
+
   async login(email: string, password: string) {
+    const generation = this.sessionGeneration;
     const response = await axios.post<AuthResponse>(`${API_URL}/auth/login`, {
       email,
       password,
-    });
+    }, { timeout: 10000 });
 
     
     if (!response.data.success) {
       throw new Error(response.data.message);
     }
     
-    if (response.data.accessToken && response.data.refreshToken) {
-      this.setTokens(response.data);
-    }
+    if (!response.data.accessToken || !response.data.refreshToken || generation !== this.sessionGeneration) throw new Error('Could not establish a session. Please sign in again.');
+    this.setTokens(response.data);
     return response.data
   }
 
@@ -35,14 +44,18 @@ class AuthService {
     gender?: string;
     age?: number;
   }) {
-    console.log("Sending signup data:", signupData); // Log the data being sent
 
     const response = await axios.post(`${API_URL}/auth/signup`, signupData, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      }, timeout: 20000
     });
 
+    return response.data;
+  }
+
+  async resendOtp(email: string) {
+    const response = await axios.post(`${API_URL}/otp/generate`, { email }, { timeout: 15000 });
     return response.data;
   }
 
@@ -50,40 +63,41 @@ class AuthService {
     const response = await axios.post<AuthResponse>(`${API_URL}/otp/verify`, {
       email,
       otp,
-    });
+    }, { timeout: 10000 });
 
-    if (response.data.accessToken && response.data.refreshToken) {
-      this.setTokens(response.data);
-    }
     return response.data;
   }
 
   async refreshToken() {
-    try {
-    
-      const refreshToken = this.getRefreshToken();
+    if (this.refreshInFlight) return this.refreshInFlight;
+    const refreshToken = this.getRefreshToken();
+    const generation = this.sessionGeneration;
+    const pending = (async () => {
       if (!refreshToken) throw new Error('No refresh token found');
 
       const response = await axios.post<AuthResponse>(`${API_URL}/auth/refreshtoken`, {
         token: refreshToken
-      });
+      }, { timeout: 10000 });
 
-      if (response.data.accessToken && response.data.refreshToken) {
+      if (response.data.accessToken && response.data.refreshToken && generation === this.sessionGeneration && this.getRefreshToken() === refreshToken) {
         this.setTokens(response.data);
       }
       return response.data;
-    } catch (error) {
-      this.logout();
+    })();
+    this.refreshInFlight = pending;
+    try { return await pending; }
+    catch (error) {
+      if (this.isInvalidRefresh(error) && generation === this.sessionGeneration && this.getRefreshToken() === refreshToken) this.clearTokens();
       throw error;
-    }
+    } finally { if (this.refreshInFlight === pending) this.refreshInFlight = null; }
   }
 
   async forgotPassword(email: string) {
     try {
-      const response = await axios.post(`${API_URL}/auth/forgotpassword`, { email });
+      const response = await axios.post(`${API_URL}/auth/forgotpassword`, { email }, { timeout: 15000 });
       return response; // Return the entire response
     } catch (error: any) {
-      console.error('Forgot password error:', error.response || error);
+
       throw error;
     }
   }
@@ -94,7 +108,7 @@ class AuthService {
         email,
         otp,
         newPassword
-      });
+      }, { timeout: 10000 });
       return {
         success: response.data.success,
         message: response.data.message
@@ -108,35 +122,23 @@ class AuthService {
   }
 
   async logout() {
-    try {
-      const refreshToken = this.getRefreshToken();
-      if (refreshToken) {
-        await axios.post(`${API_URL}/auth/logout`, { refreshToken });
-      }
-    } catch (error) {
-      console.error('Error during logout:', error);
-    } finally {
-      // Clear all auth-related data
-      this.clearTokens();
-      localStorage.removeItem('user');
-      localStorage.removeItem('pendingEducatorRegistration');
-      
-      // Clear any other app-specific data
-      localStorage.removeItem('lastViewedCourse');
-      localStorage.removeItem('courseProgress');
-      
-      // Clear all cookies
-      document.cookie.split(";").forEach(cookie => {
-        document.cookie = cookie
-          .replace(/^ +/, "")
-          .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-      });
+    const refreshToken = this.getRefreshToken();
+    this.sessionGeneration++;
+    this.clearTokens();
+    for (const key of ['user', 'pendingEducatorRegistration']) {
+      try { localStorage.removeItem(key); } catch { /* Storage may be unavailable. */ }
     }
+    try {
+      if (refreshToken) {
+        await axios.post(`${API_URL}/auth/logout`, { refreshToken }, { timeout: 3000 });
+      }
+    } catch { /* Local session is already cleared even when revocation fails. */ }
   }
 
   setTokens(data: AuthResponse) {
-    document.cookie = `accessToken=${data.accessToken}; path=/`;
-    document.cookie = `refreshToken=${data.refreshToken}; path=/`;
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `accessToken=${data.accessToken}; path=/; SameSite=Lax; Max-Age=900${secure}`;
+    document.cookie = `refreshToken=${data.refreshToken}; path=/; SameSite=Lax; Max-Age=604800${secure}`;
   }
 
   getAccessToken() {
@@ -164,7 +166,7 @@ class AuthService {
       const response = await axios.get(`${API_URL}/auth/validate`, {
         headers: {
           Authorization: `Bearer ${this.getAccessToken()}`
-        }
+        }, timeout: 10000
       });
       return response.data;
     } catch (error: any) {
@@ -180,11 +182,11 @@ class AuthService {
       const response = await axios.get(`${API_URL}/auth/profile`, {
         headers: {
           Authorization: `Bearer ${this.getAccessToken()}`
-        }
+        }, timeout: 10000
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Profile could not be loaded');
       throw error;
     }
   }
@@ -197,7 +199,7 @@ class AuthService {
           return config;
         }
         const token = this.getAccessToken();
-        console.log('refreshing token.. ')
+
         if (token) {
           config.headers['Authorization'] = `Bearer ${token}`;
         }
@@ -213,19 +215,22 @@ class AuthService {
       async (error) => {
         const originalRequest = error.config;
         
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry && originalRequest.url !== `${API_URL}/auth/refreshtoken` && originalRequest.url !== `${API_URL}/auth/logout`) {
           originalRequest._retry = true;
           if(originalRequest.url === `${API_URL}/auth/login`) {
             return Promise.reject(error);
           }
           
           try {
+            const generation = this.sessionGeneration;
             await this.refreshToken();
+            if (generation !== this.sessionGeneration) return Promise.reject(error);
             const token = this.getAccessToken();
+            if (!token) return Promise.reject(error);
             originalRequest.headers['Authorization'] = `Bearer ${token}`;
             return axios(originalRequest);
           } catch (refreshError) {
-            this.clearTokens();
+            // Another request may have already rotated the token.
             // window.location.href = '/login';
             return Promise.reject(refreshError);
           }
@@ -240,9 +245,3 @@ class AuthService {
 const authService = new AuthService();
 authService.setupAxiosInterceptors();
 export default authService;
-
-
-
-
-
-

@@ -16,7 +16,7 @@ class DoubtService {
     try {
       const response = await axios.post(
         `${API_URL}/content/createDoubt`,
-        { contentId, title, description },
+        { contentId, title, description, message: description },
         { headers: this.getHeaders() }
       );
       return response.data;
@@ -75,12 +75,12 @@ class DoubtService {
       return response.data;
     } catch (error) {
       console.error('Error fetching content doubts:', error);
-      return {
-        success: false,
-        message: 'Failed to fetch content doubts',
-        doubts: []
-      };
+      throw error;
     }
+  }
+
+  async resolveDoubt(doubtId: string) {
+    return (await axios.patch(`${API_URL}/content/doubts/${doubtId}/resolve`, {}, { headers: this.getHeaders() })).data;
   }
 }
 

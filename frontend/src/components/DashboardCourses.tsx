@@ -1,7 +1,8 @@
 import Link from 'next/link';
+import type { Course } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 
-export default function DashboardCourses({ courses }) {
+export default function DashboardCourses({ courses }: { courses: Course[] }) {
   const { user } = useAuth();
 
   return (

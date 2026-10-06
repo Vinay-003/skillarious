@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 // User related types
 export interface User {
   id: string;
@@ -96,9 +98,9 @@ export interface CategoryCourse {
 
 // Module related types
 export interface Module {
-  [x: string]: string;
   id: string;
   name: string;
+  thumbnail?: string;
   duration?: number;
   videoCount?: number;
   materialCount?: number;
@@ -109,7 +111,7 @@ export interface Module {
 
 // Class related types
 export interface Class {
-  [x: string]: number;
+  order?: number;
   title: string;
   description: string;
   videoUrl: string;
@@ -151,6 +153,7 @@ export interface Review {
   createdAt: string;
   userId: string;
   courseId: string;
+  isOwner?: boolean;
 }
 
 // Transaction related types
@@ -236,3 +239,6 @@ export interface AdminLog {
 
 
 
+
+export interface Content { id: string; moduleId: string; title?: string; description?: string; [key: string]: unknown }
+export interface Comment { id:string; user:string; timestamp:string; content:string }

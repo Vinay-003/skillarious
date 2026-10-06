@@ -1,4 +1,5 @@
 'use client';
+import { useRequiredParams } from '@/hooks/useRequiredParams';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -9,7 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import courseService from '@/services/course.service';
 import CourseModuleDoubts from '@/components/CourseModuleDoubts';
 
-export default function EducatorCourseDoubtsPage({ params }: { params: { courseId: string } }) {
+export default function EducatorCourseDoubtsPage() {
+  const params = useRequiredParams<{ courseId: string }>();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);

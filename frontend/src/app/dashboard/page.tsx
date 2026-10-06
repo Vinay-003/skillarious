@@ -1,18 +1,7 @@
 'use client';
-
-import { useState, useEffect } from 'react';
-import { Calendar, Clock, Book, Award, Activity } from 'lucide-react';
-import CourseCard from '@/components/CourseCard';
-
-export default function DashboardPage() {
-  const [activeCourses, setActiveCourses] = useState([]);
-  const [upcomingDeadlines, setUpcomingDeadlines] = useState([]);
-  const [recentActivities, setRecentActivities] = useState([]);
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-white mb-8">Dashboard</h1>
-    </div>
-  );
-}
-
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import StudentService from '@/services/student.service';
+import { useAuth } from '@/context/AuthContext';
+import type { EnrolledCourse } from '@/types/api';
+export default function DashboardPage(){const {user,loading:authLoading}=useAuth();const [courses,setCourses]=useState<EnrolledCourse[]>([]);const [state,setState]=useState<'loading'|'ready'|'error'>('loading');useEffect(()=>{if(authLoading)return;if(!user){setState('ready');return}StudentService.getEnrolledCourses().then(r=>{if(!r.success)throw Error(r.message);setCourses(r.data||[]);setState('ready')}).catch(()=>setState('error'))},[user,authLoading]);return <div className="shell page-section"><p className="eyebrow mb-5">Your learning / Studio</p><h1 className="editorial-title">{user?`Welcome back${user.name?`, ${user.name.split(' ')[0]}`:''}.`:'Your studio awaits.'}</h1><p className="lede mt-5 mb-12">Every step forward counts. Pick up where you left off.</p>{!user&&!authLoading?<div className="studio-card p-8"><h2 className="text-2xl mb-4">Sign in to see your learning.</h2><Link href="/login" className="studio-button">Sign in</Link></div>:state==='loading'?<p role="status">Loading your courses…</p>:state==='error'?<div className="studio-card p-8" role="alert"><h2 className="text-2xl">Your learning is unavailable right now.</h2><p className="text-[var(--muted-ink)]">We couldn&apos;t load enrolled courses; your progress has not been replaced with preview data.</p></div>:courses.length?<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">{courses.map((course,i)=><article className="studio-card p-7" key={course.id}><p className="eyebrow mb-5">Your course / {String(i+1).padStart(2,'0')}</p><h2 className="text-3xl mb-3">{course.name}</h2><p className="text-[var(--muted-ink)] mb-6">With {course.educatorName||'your educator'}</p><div className="border-t border-[var(--line)] pt-4"><p className="text-sm mb-2">{Math.round(course.completionRate||0)}% complete</p><progress aria-label={`${course.name} progress`} value={course.completionRate||0} max={100} className="w-full accent-[var(--forest)]"/><Link href={`/courses/access/${course.id}`} className="studio-button mt-6">Continue learning ↗</Link></div></article>)}</div>:<div className="studio-card p-8"><h2 className="text-3xl">Your next chapter is waiting.</h2><p className="text-[var(--muted-ink)] mt-2 mb-6">You haven&apos;t enrolled in a course yet.</p><Link href="/courses" className="studio-button">Explore courses ↗</Link></div>}{user?.isEducator&&<p className="mt-12"><Link className="studio-button studio-button-outline" href="/educator">Visit educator workspace ↗</Link></p>}{user?.isAdmin&&<p className="mt-3"><Link href="/admin/dashboard">Open administration ↗</Link></p>}</div>}

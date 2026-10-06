@@ -36,6 +36,7 @@ export default function ContentDoubtsThread({
   canReply = false
 }: ContentDoubtsThreadProps) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [doubts, setDoubts] = useState<ContentDoubt[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
@@ -50,7 +51,9 @@ export default function ContentDoubtsThread({
   const fetchDoubts = async () => {
     try {
       setLoading(true);
+      setError(false);
       const response = await doubtService.getDoubtsByContent(contentId);
+      if (response.success === false) throw new Error(response.message || 'Unable to load questions');
       const baseDoubts = Array.isArray(response?.doubts) ? response.doubts : [];
 
       const withMessages = await Promise.all(
@@ -72,6 +75,7 @@ export default function ContentDoubtsThread({
 
       setDoubts(withMessages);
     } catch (error) {
+      setError(true);
       console.error('Failed to fetch doubts by content:', error);
       toast.error('Failed to load doubts');
     } finally {
@@ -158,7 +162,7 @@ export default function ContentDoubtsThread({
         </form>
       )}
 
-      {loading ? (
+      {error ? <p role="alert" className="text-[var(--muted-ink)]">Questions could not be loaded. Please try again later.</p> : loading ? (
         <p className="text-gray-400 text-sm">Loading doubts...</p>
       ) : doubts.length === 0 ? (
         <p className="text-gray-400 text-sm">No doubts yet for this content.</p>

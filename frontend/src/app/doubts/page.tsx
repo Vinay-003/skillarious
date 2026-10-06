@@ -12,6 +12,7 @@ import DoubtForm from '@/components/DoubtForm';
 export default function DoubtsPage() {
   const [doubts, setDoubts] = useState<Doubt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [filter, setFilter] = useState<'all' | 'open' | 'resolved'>('all');
   const [selectedDoubtId, setSelectedDoubtId] = useState<string | null>(null);
   const [showNewDoubtForm, setShowNewDoubtForm] = useState(false);
@@ -31,9 +32,12 @@ export default function DoubtsPage() {
   const fetchDoubts = async () => {
     try {
       setLoading(true);
+      setError(false);
       const response = await doubtService.getDoubts(filter);
-      setDoubts(response.doubts);
+      if (response.success === false) throw new Error(response.message || 'Unable to load questions');
+      setDoubts(response.doubts || []);
     } catch (error) {
+      setError(true);
       toast.error('Failed to fetch doubts');
     } finally {
       setLoading(false);
@@ -54,9 +58,9 @@ export default function DoubtsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="shell page-section">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-white">My Doubts</h1>
+        <div><p className="eyebrow mb-4">Your questions / Conversations</p><h1 className="editorial-title">Ask, then grow.</h1></div>
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-gray-800 rounded-lg p-2">
             <Filter className="w-5 h-5 text-gray-400 mr-2" />
@@ -72,7 +76,7 @@ export default function DoubtsPage() {
           </div>
           <button
             onClick={() => setShowNewDoubtForm(true)}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            className="studio-button"
           >
             Ask a Doubt
           </button>
@@ -122,7 +126,7 @@ export default function DoubtsPage() {
       )}
 
       {/* Doubts List */}
-      {doubts.length === 0 ? (
+      {error ? <div className="studio-card p-8" role="alert">Questions could not be loaded. No preview questions are shown as real data. <button className="underline" onClick={fetchDoubts}>Try again</button></div> : doubts.length === 0 ? (
         <div className="text-center py-12">
           <MessageCircle className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-white mb-2">No doubts found</h2>
@@ -138,7 +142,7 @@ export default function DoubtsPage() {
             <div
               key={doubt.id}
               onClick={() => setSelectedDoubtId(doubt.id)}
-              className="bg-gray-800 rounded-lg p-6 hover:bg-gray-700 transition-colors cursor-pointer"
+              className="studio-card p-6 hover:border-[var(--forest)] transition-colors cursor-pointer"
             >
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-xl font-semibold text-white">{doubt.title}</h3>
@@ -161,4 +165,3 @@ export default function DoubtsPage() {
     </div>
   );
 }
-

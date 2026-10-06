@@ -28,7 +28,7 @@ export default function CourseReviews({ courseId }: { courseId: string }) {
         try {
             const response = await reviewService.getCourseReviews(courseId);
             setReviews(response.reviews);
-            const userReview = response.reviews.find(review => review.isOwner);
+            const userReview = (response.reviews as Review[]).find(review => review.isOwner);
             if (userReview) {
                 setUserReview(userReview);
             }

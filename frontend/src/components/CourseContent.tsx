@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import LearningAssistant from '@/components/LearningAssistant';
 
 interface CourseContentProps {
   courseId: string;
@@ -86,6 +87,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
 
   return (
     <div className="space-y-4">
+      <LearningAssistant courseId={courseId} title="Ask about this course" />
       {modules.map((module) => (
         <div key={module.id} className="bg-gray-800 rounded-lg overflow-hidden">
           <div 
@@ -181,6 +183,5 @@ export default function CourseContent({ courseId }: CourseContentProps) {
     </div>
   );
 }
-
 
 

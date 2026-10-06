@@ -1,4 +1,5 @@
 'use client';
+import { useRequiredParams } from '@/hooks/useRequiredParams';
 import { Course } from '@/types';
 import courseService from '@/services/course.service';
 import reviewService from '@/services/review.service';
@@ -10,10 +11,14 @@ import Image from 'next/image';
 import { FollowerPointerCard } from '@/components/ui/following-pointer';
 import PaymentModal from '@/components/PaymentModal';
 import { useAuth } from '@/context/AuthContext';
+import LearningAssistant from '@/components/LearningAssistant';
+import libraryService, { libraryError, Playlist } from '@/services/library.service';
+import Link from 'next/link';
 
-export default function SingleCoursePage({ params }: { params: { courseId: string } }) {
+export default function SingleCoursePage() {
+  const params = useRequiredParams<{ courseId: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true); 
   const [error, setError] = useState<string | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
@@ -21,6 +26,37 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
   const [averageRating, setAverageRating] = useState<number | null>(null);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [followed, setFollowed] = useState(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [libraryErrorText, setLibraryErrorText] = useState('');
+  const [libraryRetry, setLibraryRetry] = useState(0);
+
+  useEffect(() => {
+    if (authLoading || !user || !course) return;
+    let active = true;
+    setLibraryLoading(true);
+    setLibraryErrorText('');
+    Promise.all([libraryService.likes(), libraryService.subscriptions(), libraryService.playlists()])
+      .then(([likes, subscriptions, saved]) => {
+        if (!active) return;
+        setLiked(likes.some(item => item.id === course.id));
+        setFollowed(subscriptions.some(item => item.id === course.educatorId));
+        setPlaylists(saved);
+      })
+      .catch(error => { if (active) setLibraryErrorText(libraryError(error)); })
+      .finally(() => { if (active) setLibraryLoading(false); });
+    return () => { active = false; };
+  }, [authLoading, user, course, libraryRetry]);
+
+  async function updateLibrary(action: () => Promise<unknown>, refresh: () => Promise<void>) {
+    setLibraryBusy(true); setLibraryErrorText('');
+    try { await action(); await refresh(); }
+    catch (error) { setLibraryErrorText(libraryError(error)); }
+    finally { setLibraryBusy(false); }
+  }
 
   useEffect(() => {
     fetchCourse();
@@ -40,7 +76,7 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
     try {
         setLoading(true);
         const response = await courseService.getSingleCourse(params.courseId);
-        setCourse(response.data); // Changed from response.course to response.data based on backend response
+        setCourse(response.data || response.course);
     } catch (error) {
         console.error('Error fetching course:', error);
         setError('Failed to fetch course');
@@ -115,7 +151,7 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
       return (
         <button
           disabled
-          className="w-half bg-green-700 text-white py-2 px-4 rounded-md cursor-not-allowed"
+          className="studio-button"
         >
           Enrolled
         </button>
@@ -137,9 +173,9 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
     return (
       <button
         onClick={handlePurchaseClick}
-        className="w-half bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-md transition-colors duration-200"
+        className="studio-button"
       >
-        {Number(course?.price) === 0 ? 'Add To My Courses' : 'Buy'}
+        {Number(course?.price) === 0 ? 'Add to my courses' : 'Continue to PayPal'}
       </button>
     );
   };
@@ -163,16 +199,16 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="shell page-section">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-white">Course Details</h1>
+        <p className="eyebrow mb-4">The collection / Course details</p><h1 className="editorial-title mb-10">{course?.name}</h1>
         <div className="grid grid-cols-1 gap-8">
           {/* Left Column - Course Image and Basic Info */}
           <FollowerPointerCard>
-            <div className="relative w-full h-full flex flex-col bg-gray-800 rounded-lg p-6">
+            <div className="relative w-full h-full flex flex-col studio-card p-6">
               <div className="relative w-full h-64">
                 <Image
-                  src={course?.thumbnail || "/placeholder-course.jpg"}
+                  src={course?.thumbnail || "/course/placeholder.png"}
                   alt={course?.name || "Course Name"}
                   fill
                   className="object-cover rounded-lg"
@@ -180,12 +216,12 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
                 />
               </div>
               <div className="flex-grow mt-6">
-                <h3 className="font-semibold text-2xl text-white mb-4">
+                <h3 className="font-semibold text-2xl mb-4">
                   {course?.name}
                 </h3>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-lg text-white">
-                    {Number(course?.price) === 0 ? 'Free' : `₹${course?.price}`}
+                  <span className="text-lg">
+                    {Number(course?.price) === 0 ? 'Free' : `$${Number(course?.price).toFixed(2)} USD`}
                   </span>
                   {renderPurchaseButton()}
                 </div>
@@ -195,40 +231,66 @@ export default function SingleCoursePage({ params }: { params: { courseId: strin
 
           {/* Right Column - Course Details */}
           <div className="space-y-6">
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">About This Course</h2>
-              <p className="text-gray-300 mb-4">{course?.about}</p>
-              <div className="border-t border-gray-700 pt-4">
-                <h3 className="text-lg font-medium text-white mb-3">Description</h3>
-                <p className="text-gray-300">{course?.description}</p>
+            <div className="studio-card p-6">
+              <h2 className="text-2xl mb-4">About this course</h2>
+              <p className="text-[var(--muted-ink)] mb-4">{course?.about}</p>
+              <div className="border-t border-[var(--line)] pt-4">
+                <h3 className="text-lg mb-3">What you&apos;ll explore</h3>
+                <p className="text-[var(--muted-ink)]">{course?.description}</p>
               </div>
             </div>
 
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h2 className="text-xl font-semibold text-white mb-4">Course Information</h2>
+            {user && course && <div className="studio-card p-6 space-y-4">
+              <h2 className="text-2xl">Your library</h2>
+              {libraryErrorText && <p role="alert" className="text-red-600">{libraryErrorText} <button className="underline" onClick={() => setLibraryRetry(value => value + 1)}>Retry</button></p>}
+              {libraryLoading ? <p>Loading your library…</p> : <>
+                <div className="flex flex-wrap gap-4">
+                  <button className="studio-button" disabled={libraryBusy || Boolean(libraryErrorText)} onClick={() => void updateLibrary(
+                    () => liked ? libraryService.unlike(course.id) : libraryService.like(course.id),
+                    async () => setLiked((await libraryService.likes()).some(item => item.id === course.id))
+                  )}>{liked ? 'Unlike course' : 'Like course'}</button>
+                  <button className="studio-button" disabled={libraryBusy || Boolean(libraryErrorText)} onClick={() => void updateLibrary(
+                    () => followed ? libraryService.unfollow(course.educatorId) : libraryService.follow(course.educatorId),
+                    async () => setFollowed((await libraryService.subscriptions()).some(item => item.id === course.educatorId))
+                  )}>{followed ? 'Unfollow educator' : 'Follow educator'}</button>
+                </div>
+                <div><label htmlFor="save-playlist" className="block mb-2">Save to a playlist</label>
+                  <select id="save-playlist" className="studio-card p-2 max-w-full" disabled={libraryBusy || Boolean(libraryErrorText)} value="" onChange={event => {
+                    const playlistId = event.target.value;
+                    if (!playlistId) return;
+                    void updateLibrary(() => libraryService.addCourse(playlistId, course.id), async () => setPlaylists(await libraryService.playlists()));
+                  }}><option value="">Choose a playlist</option>{playlists.filter(playlist => !playlist.courses.some(item => item.id === course.id)).map(playlist => <option key={playlist.id} value={playlist.id}>{playlist.name}</option>)}</select>
+                  <p className="mt-2 text-sm">{playlists.filter(playlist => playlist.courses.some(item => item.id === course.id)).map(playlist => playlist.name).join(', ') || 'Not in a playlist yet.'} <Link className="underline" href="/playlists">Manage playlists</Link></p>
+                </div>
+              </>}
+            </div>}
+
+            <div className="studio-card p-6">
+              <h2 className="text-2xl mb-4">At a glance</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400">Instructor</h4>
-                  <p className="text-white">{course?.educatorName}</p>
+                  <h4 className="text-sm font-medium text-[var(--muted-ink)]">Instructor</h4>
+                  <p>{course?.educatorName}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400">Start Date</h4>
-                  <p className="text-white">
+                  <h4 className="text-sm font-medium text-[var(--muted-ink)]">Start date</h4>
+                  <p>
                     {course?.start ? new Date(course.start).toLocaleDateString() : 'Not specified'}
                   </p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400">Views</h4>
-                  <p className="text-white">{course?.viewcount || 0}</p>
+                  <h4 className="text-sm font-medium text-[var(--muted-ink)]">Views</h4>
+                  <p>{course?.viewcount || 0}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-gray-400">Rating</h4>
-                  <p className="text-white">
+                  <h4 className="text-sm font-medium text-[var(--muted-ink)]">Rating</h4>
+                  <p>
                     {typeof averageRating === 'number' ? averageRating.toFixed(1) : 'Not rated'}
                   </p>
                 </div>
               </div>
             </div>
+            {course && <LearningAssistant courseId={course.id} title={`Ask about ${course.name}`} />}
           </div>
         </div>
       </div>

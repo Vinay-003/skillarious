@@ -8,11 +8,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'your-storage-domain.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'res.cloudinary.com',  // For Cloudinary images
+        hostname: 'ykllmcwljsfeluhpvzbv.supabase.co',
       }
     ],
     unoptimized: true // Add this if you want to skip image optimization
@@ -20,7 +16,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
-
-
-
 

@@ -15,7 +15,7 @@ export default function AdminRegistration() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const inviteToken = searchParams.get('token');
+  const inviteToken = searchParams?.get('token');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

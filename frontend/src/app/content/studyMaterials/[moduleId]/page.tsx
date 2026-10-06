@@ -1,4 +1,6 @@
 'use client';
+import { useRequiredParams } from '@/hooks/useRequiredParams';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import contentService from '@/services/content.service';
@@ -9,11 +11,8 @@ import toast from 'react-hot-toast';
 import MaterialViewer from '@/components/MaterialViewer';
 import ContentDoubtsThread from '@/components/ContentDoubtsThread';
 
-export default function StudyMaterialsPage({
-  params
-}: {
-  params: { moduleId: string }
-}) {
+export default function StudyMaterialsPage() {
+  const params = useRequiredParams<{ moduleId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,24 +49,11 @@ export default function StudyMaterialsPage({
       setLoading(true);
       setError(null);
       
-      // Debug: Check moduleId
-      console.log('Fetching materials for moduleId:', params.moduleId);
-      
       if (!params.moduleId) {
         throw new Error('Module ID is required');
       }
 
-      // Debug: Check auth token
-      const token = AuthService.getAccessToken();
-      console.log('Auth token present:', !!token);
-
-      // Debug: Log API call
-      console.log('Making API request to:', `${process.env.NEXT_PUBLIC_API_URL}/content/getModuleStudyMaterials/${params.moduleId}`);
-
       const response = await contentService.getModuleStudyMaterials(params.moduleId);
-      
-      // Debug: Log response
-      console.log('API Response:', response);
 
       if (response.success === false && response.message === 'No study materials found for this module') {
         setStudyMaterials([]);
@@ -219,6 +205,7 @@ export default function StudyMaterialsPage({
       {/* Material Viewer Modal */}
       {selectedMaterial && (
         <MaterialViewer
+          contentId={selectedMaterial.id}
           fileUrl={selectedMaterial.fileUrl}
           fileType={selectedMaterial.type}
           title={selectedMaterial.title}

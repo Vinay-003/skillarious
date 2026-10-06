@@ -1,4 +1,5 @@
 'use client';
+import { useRequiredParams } from '@/hooks/useRequiredParams';
 
 import { useEffect, useState } from 'react';
 import ContentService from '@/services/content.service';
@@ -10,11 +11,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import AuthService from '@/services/auth.service';
 
-export default function ModulePage({
-  params,
-}: {
-  params: { courseId: string };
-}) {
+export default function ModulePage() {
+  const params = useRequiredParams<{ courseId: string }>();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [modules, setModules] = useState<Module[]>([]);

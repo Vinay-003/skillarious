@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { doubtService } from '@/services/doubt.service';
 import { Doubt, Message } from '@/types';
 import DoubtReply from './DoubtReply';
+import LearningAssistant from '@/components/LearningAssistant';
 
 interface DoubtDetailsProps {
   doubtId: string;
@@ -12,6 +13,7 @@ export default function DoubtDetails({ doubtId }: DoubtDetailsProps) {
   const [doubt, setDoubt] = useState<Doubt | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resolving, setResolving] = useState(false);
 
   useEffect(() => {
     fetchDoubtDetails();
@@ -62,7 +64,9 @@ export default function DoubtDetails({ doubtId }: DoubtDetailsProps) {
         ))}
       </div>
 
-      <DoubtReply doubtId={doubtId} onReplyAdded={handleReplyAdded} />
+      {!doubt.resolved && <DoubtReply doubtId={doubtId} onReplyAdded={handleReplyAdded} />}
+      {doubt.resolved ? <p className="mt-4 text-sm">Resolved. Your conversation is saved.</p> : <button type="button" className="studio-button studio-button-outline mt-4" disabled={resolving} onClick={async () => { setResolving(true); try { await doubtService.resolveDoubt(doubtId); setDoubt({ ...doubt, resolved: true, status: 'resolved' }); } catch { toast.error('Could not resolve this question'); } finally { setResolving(false); } }}>{resolving ? 'Saving…' : 'Mark resolved'}</button>}
+      <LearningAssistant doubtId={doubtId} title={`Explore: ${doubt.title}`} />
     </div>
   );
 }

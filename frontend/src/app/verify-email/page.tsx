@@ -1,22 +1,41 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { redirect, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { VerificationSessionError } from '@/context/AuthContext';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
+import authService from '@/services/auth.service';
 import { Mail } from 'lucide-react';
 
 export default function VerifyEmail() {
+  return <Suspense fallback={<div className="shell page-section">Loading verification…</div>}><VerifyEmailForm /></Suspense>;
+}
+
+function VerifyEmailForm() {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState('');
+  const [signInRecovery, setSignInRecovery] = useState(false);
   const [resendDisabled, setResendDisabled] = useState(false);
-  const [countdown, setCountdown] = useState(120); // 2 minutes countdown
+  const [restricted, setRestricted] = useState(false);
+  const [countdown, setCountdown] = useState(60);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const searchParams = useSearchParams();
-  const email = searchParams.get('email');
+  const email = searchParams?.get('email');
   const { verifyOtp } = useAuth();
 
   useEffect(() => {
+    try {
+      const failure = sessionStorage.getItem('verificationEmailFailure');
+      sessionStorage.removeItem('verificationEmailFailure');
+      if (failure === 'EMAIL_RECIPIENT_RESTRICTED') {
+        setRestricted(true);
+         setError('Resend’s default test sender needs no domain, but it only sends to the email address on the Resend account. Use that inbox for testing, or verify a domain for other addresses.');
+      } else if (failure === 'EMAIL_DELIVERY_UNAVAILABLE') setError('Verification email could not be sent. Please try resending a code.');
+    } catch { /* Optional recovery hint. */ }
     if (!email) {
       window.location.href = '/signup';
     }
@@ -80,12 +99,15 @@ export default function VerifyEmail() {
     }
 
     setLoading(true);
+    setError('');
+    setSignInRecovery(false);
     try {
       await verifyOtp(email, otpString);
-      toast.success('Email verified successfully! Please log in.');
-      redirect('/');
+      toast.success('Email verified successfully!');
+
     } catch (error: any) {
-      toast.error(error.message || 'Verification failed');
+      setError(error.message || 'Verification failed');
+      setSignInRecovery(error instanceof VerificationSessionError || error.code === 'EMAIL_ALREADY_VERIFIED');
       // Clear OTP fields on error
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
@@ -95,26 +117,23 @@ export default function VerifyEmail() {
   };
 
   const handleResendOtp = async () => {
-    if (!email || resendDisabled) return;
-
+    if (!email || resendDisabled || resending || restricted) return;
+    setResending(true); setError('');
     try {
-      const response = await fetch('/api/v1/otp/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
+      const data = await authService.resendOtp(email);
       if (data.success) {
-        toast.success('New verification code sent!');
+        toast.success('If eligible, a verification email was accepted for sending.');
         setResendDisabled(true);
-        setCountdown(120);
+        setCountdown(60);
       } else {
         throw new Error(data.message);
       }
     } catch (error: any) {
-      toast.error(error.message || 'Failed to resend verification code');
-    }
+      if (error?.response?.data?.code === 'EMAIL_RECIPIENT_RESTRICTED') {
+        setRestricted(true);
+         setError('Resend’s default test sender needs no domain, but it only sends to the email address on the Resend account. Use that inbox for testing, or verify a domain for other addresses.');
+      } else setError('Verification email could not be sent. Please try again later.');
+    } finally { setResending(false); }
   };
 
   return (
@@ -126,7 +145,7 @@ export default function VerifyEmail() {
           </div>
           <h2 className="text-3xl font-bold text-white">Verify Your Email</h2>
           <p className="mt-2 text-gray-400">
-            We sent a verification code to
+            Enter the verification code for
           </p>
           <p className="text-red-500 font-medium">{email}</p>
         </div>
@@ -161,16 +180,18 @@ export default function VerifyEmail() {
             {loading ? 'Verifying...' : 'Verify Email'}
           </button>
         </form>
+        {error && <p role="alert" className="text-sm border border-[var(--line)] p-3">{error}</p>}
+        {signInRecovery && <p className="text-sm text-gray-300">Already verified or unable to finish signing in? <Link href="/login" className="text-red-500 underline">Sign in</Link> to continue.</p>}
 
         <div className="text-center">
           <p className="text-gray-400">
-            Didn't receive the code?{' '}
+            Didn&apos;t receive the code?{' '}
             <button
               onClick={handleResendOtp}
-              disabled={resendDisabled}
+               disabled={resendDisabled || resending || restricted}
               className={`text-red-600 hover:text-red-500 ${resendDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              {resendDisabled 
+               {restricted ? 'Resend unavailable for this recipient' : resending ? 'Sending…' : resendDisabled
                 ? `Resend in ${countdown}s` 
                 : 'Resend code'}
             </button>
@@ -180,4 +201,3 @@ export default function VerifyEmail() {
     </div>
   );
 }
-

@@ -1,14 +1,17 @@
 'use client';
+import { useRequiredParams } from '@/hooks/useRequiredParams';
+
 import { useState, useEffect } from 'react';
 import { Review } from '@/types';
 import reviewService from '@/services/review.service';
 import { Star, Edit2, Trash2, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useScroll } from 'framer-motion';
 import { useRef } from 'react';
 
-export default function ReviewPage({ params }: { params: { courseId: string } }) {
+export default function ReviewPage() {
+  const params = useRequiredParams<{ courseId: string }>();
     const { user } = useAuth();
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
@@ -19,6 +22,8 @@ export default function ReviewPage({ params }: { params: { courseId: string } })
         message: '',
     });
     const [isPurchased, setIsPurchased] = useState(true);
+    const containerRef = useRef(null);
+    const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start end", "end start"] });
 
     const isReviewOwner = (review: Review) => {
         return user?.id === review.userId;
@@ -146,12 +151,6 @@ export default function ReviewPage({ params }: { params: { courseId: string } })
             </div>
         );
     }
-
-    const containerRef = useRef(null);
-    const { scrollYProgress } = useScroll({
-        target: containerRef,
-        offset: ["start end", "end start"]
-    });
 
     return (
         <div className="max-w-4xl mx-auto p-4 space-y-8">
@@ -287,13 +286,6 @@ export default function ReviewPage({ params }: { params: { courseId: string } })
                         transition={{
                             duration: 0.5,
                             delay: index * 0.1
-                        }}
-                        style={{
-                            y: useTransform(
-                                scrollYProgress,
-                                [0, 1],
-                                [0, index % 2 === 0 ? -50 : 50]
-                            )
                         }}
                     >
                         <div className="flex justify-between items-start">

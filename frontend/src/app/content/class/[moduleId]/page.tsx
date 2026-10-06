@@ -1,4 +1,6 @@
 'use client'
+import { useRequiredParams } from '@/hooks/useRequiredParams';
+
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -10,8 +12,10 @@ import { useAuth } from '@/context/AuthContext'
 import { FileUpload } from '@/components/FileUpload'
 import ContentDoubtsThread from '@/components/ContentDoubtsThread'
 import { resolveMediaUrl } from '@/utils/mediaUrl'
+import LearningAssistant from '@/components/LearningAssistant'
 
-export default function ClassVideosPage({ params }: { params: { moduleId: string } }) {
+export default function ClassVideosPage() {
+  const params = useRequiredParams<{ moduleId: string }>();
     const { user } = useAuth()
     const router = useRouter();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -229,6 +233,7 @@ export default function ClassVideosPage({ params }: { params: { moduleId: string
                                         allowAsk={!user?.isEducator}
                                         canReply={Boolean(user?.isEducator)}
                                     />
+                                    <div className="mt-6"><LearningAssistant contentId={cls.id} title={`Ask about ${cls.title || 'this lesson'}`} /></div>
                                 </div>
                             )}
                         </div>
@@ -244,7 +249,6 @@ export default function ClassVideosPage({ params }: { params: { moduleId: string
         </div>
     );
 }
-
 
 
 

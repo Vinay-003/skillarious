@@ -29,11 +29,7 @@ const CourseService = {
       };
     } catch (error) {
       console.error('Error searching courses:', error);
-      return {
-        success: false,
-        message: axios.isAxiosError(error) ? error.response?.data?.message : 'Failed to search courses',
-        courses: []
-      };
+      throw error;
     }
   },
 
@@ -129,5 +125,4 @@ const CourseService = {
 };
 
 export default CourseService;
-
 

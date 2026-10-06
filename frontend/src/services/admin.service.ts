@@ -1,32 +1,28 @@
 import axios from 'axios';
+import authService from './auth.service';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const adminApi = axios.create({ baseURL: `${API_URL}/admin` });
+adminApi.interceptors.request.use(config => {
+  if (config.url !== '/register') {
+    const token = authService.getAccessToken();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 const adminService = {
-  // Platform Overview
-  getPlatformOverview: () => axios.get(`${API_URL}/admin/overview`),
-
-  // User Management
-  getUsers: () => axios.get(`${API_URL}/admin/users`),
-  banUser: (userId: string, reason: string) =>
-    axios.post(`${API_URL}/admin/users/${userId}/ban`, { reason }),
-  unbanUser: (userId: string) =>
-    axios.post(`${API_URL}/admin/users/${userId}/unban`),
-
-  // Course Management
-  getCourses: () => axios.get(`${API_URL}/admin/courses`),
-  dismissCourse: (courseId: string, reason: string) =>
-    axios.post(`${API_URL}/admin/courses/${courseId}/dismiss`, { reason }),
-  approveCourse: (courseId: string) =>
-    axios.post(`${API_URL}/admin/courses/${courseId}/approve`),
-
-  // Action Logs
-  getActionLogs: () => axios.get(`${API_URL}/admin/logs`),
-
-  // Reports
-  getReports: () => axios.get(`${API_URL}/admin/reports`),
-  resolveReport: (reportId: string, resolution: string) =>
-    axios.post(`${API_URL}/admin/reports/${reportId}/resolve`, { resolution }),
+  registerAdmin: (data: { name: string; email: string; password: string; inviteToken: string }) => adminApi.post('/register', data),
+  getPlatformOverview: () => adminApi.get('/overview'),
+  getUsers: () => adminApi.get('/users'),
+  banUser: (userId: string, reason: string) => adminApi.post(`/moderate/user/${encodeURIComponent(userId)}/ban`, { reason }),
+  unbanUser: (userId: string) => adminApi.post(`/moderate/user/${encodeURIComponent(userId)}/unban`, { reason: 'Ban lifted' }),
+  getCourses: () => adminApi.get('/courses'),
+  dismissCourse: (courseId: string, reason: string) => adminApi.post(`/moderate/course/${encodeURIComponent(courseId)}/dismiss`, { reason }),
+  approveCourse: (courseId: string) => adminApi.post(`/moderate/course/${encodeURIComponent(courseId)}/approve`),
+  getActionLogs: () => adminApi.get('/logs'),
+  getReports: () => adminApi.get('/reports'),
+  resolveReport: (reportId: string, resolution: string) => adminApi.post(`/reports/${encodeURIComponent(reportId)}/resolve`, { resolution }),
 };
 
 export default adminService;

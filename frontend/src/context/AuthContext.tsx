@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import authService from '@/services/auth.service';
 
@@ -33,8 +33,15 @@ interface AuthContextType {
   logout: () => Promise<void>;
   verifyOtp: (email: string, otp: string) => Promise<void>;
   refreshUser: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (email: string, otp: string, newPassword: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; message: string }> ;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
+}
+
+export class VerificationSessionError extends Error {
+  constructor() {
+    super('Your email was verified, but we could not finish signing you in. Please sign in to continue.');
+    this.name = 'VerificationSessionError';
+  }
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -42,55 +49,54 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionGeneration = useRef(0);
   const router = useRouter();
 
   const fetchUserProfile = async () => {
+    const generation = sessionGeneration.current;
     try {
       const response = await authService.validateSession();
-      if (response.success) {
+      if (generation !== sessionGeneration.current) return false;
+      if (response.success && response.user) {
         setUser(response.user);
+        return true;
       } else {
         setUser(null);
+        return false;
       }
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
-      setUser(null);
+    } catch {
+      if (generation === sessionGeneration.current) setUser(null);
+      return false;
     }
   };
 
   useEffect(() => {
     const initAuth = async () => {
+      const generation = sessionGeneration.current;
       try {
         const accessToken = authService.getAccessToken();
-        console.log('Access token exists:', !!accessToken);
         
         const refreshToken = authService.getRefreshToken();
-        console.log('Refresh token exists:', !!refreshToken);
 
         if (!accessToken && !refreshToken) {
-          console.log('No tokens found, setting user to null');
-          setUser(null);
+          if (generation === sessionGeneration.current) setUser(null);
           return;
         }
 
         if (!accessToken && refreshToken) {
-          console.log('Attempting to refresh token...');
           try {
             await authService.refreshToken();
-            console.log('Token refresh successful');
           } catch (error) {
-            console.error('Token refresh failed:', error);
-            setUser(null);
+            if (generation === sessionGeneration.current) setUser(null);
             return;
           }
         }
 
-        await fetchUserProfile();
-      } catch (error) {
-        console.error('Auth initialization failed:', error);
-        setUser(null);
+        if (generation === sessionGeneration.current) await fetchUserProfile();
+      } catch {
+        if (generation === sessionGeneration.current) setUser(null);
       } finally {
-        setLoading(false);
+        if (generation === sessionGeneration.current) setLoading(false);
       }
     };
 
@@ -98,13 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await authService.login(email, password);
-      if (response.success) {
-        await fetchUserProfile(); // Fetch user profile after successful login
-      }
-    } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Login failed');
+    const generation = sessionGeneration.current;
+    const response = await authService.login(email, password);
+    if (!response.success || generation !== sessionGeneration.current || !await fetchUserProfile()) {
+      throw new Error('Could not confirm your session. Please sign in again.');
     }
   };
 
@@ -113,53 +116,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.signup(data);
       return response;
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'Failed to create account');
+      throw error;
     }
   };
 
   const verifyOtp = async (email: string, otp: string) => {
+    const generation = sessionGeneration.current;
+    let response;
     try {
-      const response = await authService.verifyOtp(email, otp);
-      if (response.success) {
-        // Save the tokens received from OTP verification
-        if (response.accessToken && response.refreshToken) {
-          authService.setTokens({
-            accessToken: response.accessToken,
-            refreshToken: response.refreshToken,
-            success: true,
-            message: response.message
-          });
-        }
-
-        // Check if user wanted to register as educator
-        const pendingEducatorRegistration = localStorage.getItem('pendingEducatorRegistration');
-        
-        if (pendingEducatorRegistration) {
-          localStorage.removeItem('pendingEducatorRegistration');
-          router.push('/educator/register');
-        } else {
-          router.push('/login');
-        }
-      }
+      response = await authService.verifyOtp(email, otp);
     } catch (error: any) {
-      throw new Error(error.response?.data?.message || 'OTP verification failed');
+      const verificationError = new Error(error.response?.data?.message || 'OTP verification failed') as Error & { code?: string };
+      verificationError.code = error.response?.data?.code;
+      throw verificationError;
     }
+    if (!response.success) {
+      const verificationError = new Error(response.message || 'OTP verification failed') as Error & { code?: string };
+      verificationError.code = (response as typeof response & { code?: string }).code;
+      throw verificationError;
+    }
+
+    try {
+      if (!response.accessToken || !response.refreshToken) throw new Error('Missing session tokens');
+      if (generation !== sessionGeneration.current) throw new Error('Session changed');
+      authService.setTokens(response);
+      const profile = await authService.validateSession();
+      if (!profile.success || !profile.user) throw new Error('Profile unavailable');
+      if (generation !== sessionGeneration.current) throw new Error('Session changed');
+      setUser(profile.user);
+    } catch {
+      if (generation === sessionGeneration.current) setUser(null);
+      throw new VerificationSessionError();
+    }
+
+    let pendingEducatorRegistration: string | null = null;
+    try {
+      pendingEducatorRegistration = localStorage.getItem('pendingEducatorRegistration');
+      if (pendingEducatorRegistration) localStorage.removeItem('pendingEducatorRegistration');
+    } catch {
+      // Optional intent must not invalidate a completed email verification.
+    }
+    router.push(pendingEducatorRegistration ? '/educator/register' : '/dashboard');
   };
 
   const logout = async () => {
+    sessionGeneration.current++;
+    setUser(null);
+    setLoading(false);
     try {
       await authService.logout();
-    } catch (error: any) {
-      console.error('Logout failed:', error);
-    } finally {
-      // Clear user state
-      setUser(null);
-      
-      // Clear any context-specific state
-      setLoading(false);
-      
-      // You might want to clear other app-specific state here
-    }
+    } catch { /* Local sign-out is authoritative. */ }
   };
   const forgotPassword = async (email: string) => {
     try {
@@ -169,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         message: response.data.message
       };
     } catch (error: any) {
-      console.error('Forgot password error:', error);
+      console.error('Password reset email is unavailable');
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to send reset code'
@@ -181,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.resetPassword(email, otp, newPassword);
       return response;
     } catch (error: any) {
-      console.error('Reset password error:', error);
+      console.error('Password reset could not be completed');
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to reset password'
@@ -190,7 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
   const refreshUser = async () => {
     try {
-      await fetchUserProfile();
+      if (!await fetchUserProfile()) throw new Error('Could not refresh your profile. Please sign in again.');
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Failed to refresh user');
     }
@@ -215,12 +221,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-
-
-
-
-
-
 
 
 
