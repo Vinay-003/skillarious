@@ -8,7 +8,6 @@ import courseService from '@/services/course.service';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import LearningAssistant from '@/components/LearningAssistant';
 
 interface CourseContentProps {
@@ -88,20 +87,16 @@ export default function CourseContent({ courseId }: CourseContentProps) {
   return (
     <div className="space-y-4">
       <LearningAssistant courseId={courseId} title="Ask about this course" />
-      {modules.map((module) => (
+      {modules.map((module, index) => (
         <div key={module.id} className="bg-[var(--surface)] border border-[var(--line)] rounded-lg overflow-hidden">
           <div 
             className="flex cursor-pointer"
             onClick={() => toggleModuleExpansion(module.id)}
           >
             <div className="relative w-48 h-32">
-              <Image
-                src={module.thumbnail || '/placeholder-module.jpg'}
-                alt={module.name}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
+              <div className="h-full w-full bg-[var(--sage)] text-[var(--forest)] grid place-items-center font-serif text-4xl" aria-hidden="true">
+                {String(index + 1).padStart(2, '0')}
+              </div>
             </div>
             <div className="flex-1 p-4">
               <div>
@@ -183,4 +178,3 @@ export default function CourseContent({ courseId }: CourseContentProps) {
     </div>
   );
 }
-

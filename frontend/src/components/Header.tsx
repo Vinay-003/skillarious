@@ -6,7 +6,7 @@ import { Menu, X, Search, Sun, Moon, Monitor, ArrowUpRight } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext';
 
 type Theme = 'light' | 'dark' | 'system';
-const links = [{ href: '/courses', label: 'Explore courses' }, { href: '/doubts', label: 'Questions' }, { href: '/dashboard', label: 'My studio' }];
+const links = [{ href: '/courses', label: 'Explore courses' }, { href: '/ask-ai', label: 'Ask AI' }, { href: '/doubts', label: 'Questions' }, { href: '/dashboard', label: 'My studio' }];
 export default function Header() {
   const { user, logout } = useAuth();
   const pathname = usePathname();

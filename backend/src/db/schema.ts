@@ -268,17 +268,17 @@ export const aiConversationsTable = pgTable('ai_conversations', {
   archived: boolean('archived').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-}, t => ({ ownerIdx: index('ai_conversations_user_id_idx').on(t.userId), contextIdx: index('ai_conversations_context_idx').on(t.contextType, t.contextId) }));
+}, t => ({ ownerIdx: index('ai_conversations_user_id_idx').on(t.userId), contextIdx: index('ai_conversations_context_idx').on(t.contextType, t.contextId), contextTypeValid: check('ai_conversations_context_type_valid', sql`${t.contextType} IN ('catalog', 'course', 'content', 'doubt')`), titleLength: check('ai_conversations_title_length', sql`length(btrim(${t.title})) BETWEEN 1 AND 200`) }));
 
 export const aiMessagesTable = pgTable('ai_messages', {
   id: uuid('id').primaryKey().defaultRandom(),
-  conversationId: uuid('conversation_id').notNull().references(() => aiConversationsTable.id),
+  conversationId: uuid('conversation_id').notNull().references(() => aiConversationsTable.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
   content: text('content').notNull(),
   model: text('model'),
   sources: json('sources'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-}, t => ({ conversationIdx: index('ai_messages_conversation_id_idx').on(t.conversationId) }));
+}, t => ({ conversationIdx: index('ai_messages_conversation_id_idx').on(t.conversationId, t.createdAt), roleValid: check('ai_messages_role_valid', sql`${t.role} IN ('user', 'assistant')`) }));
 
 export const adminInvitesTable = pgTable('admin_invites', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),

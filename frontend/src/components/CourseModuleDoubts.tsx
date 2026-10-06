@@ -2,21 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, MessageSquare } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import contentService from '@/services/content.service';
-import { doubtService } from '@/services/doubt.service';
+import ai from '@/services/ai.service';
 import DoubtReply from '@/components/DoubtReply';
-
-interface ModuleItem {
-  id: string;
-  name: string;
-}
-
-interface ContentItem {
-  id: string;
-  title: string;
-  type: 'video' | 'study-material';
-}
 
 interface DoubtMessage {
   id: string;
@@ -56,6 +43,7 @@ export default function CourseModuleDoubts({
 }) {
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<ModuleGroup[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetchAll();
@@ -64,66 +52,29 @@ export default function CourseModuleDoubts({
   const fetchAll = async () => {
     try {
       setLoading(true);
-      const modulesResponse = await contentService.getAllModules(courseId);
-      const modules: ModuleItem[] = Array.isArray(modulesResponse?.data) ? modulesResponse.data : [];
-
-      const moduleGroups = await Promise.all(
-        modules.map(async (module) => {
-          const [classesRes, materialsRes] = await Promise.all([
-            contentService.getModuleClasses(module.id).catch(() => ({ data: [] })),
-            contentService.getModuleStudyMaterials(module.id).catch(() => ({ data: [] }))
-          ]);
-
-          const classItems: ContentItem[] = (Array.isArray(classesRes?.data) ? classesRes.data : []).map((item: any) => ({
-            id: item.id,
-            title: item.title || 'Untitled Video',
-            type: 'video'
-          }));
-
-          const materialItems: ContentItem[] = (Array.isArray(materialsRes?.data) ? materialsRes.data : []).map((item: any) => ({
-            id: item.id,
-            title: item.title || 'Untitled Material',
-            type: 'study-material'
-          }));
-
-          const contents = [...classItems, ...materialItems];
-
-          const contentGroups = await Promise.all(
-            contents.map(async (content) => {
-              const doubtsRes = await doubtService.getDoubtsByContent(content.id).catch(() => ({ doubts: [] }));
-              const baseDoubts = Array.isArray(doubtsRes?.doubts) ? doubtsRes.doubts : [];
-
-              const doubtsWithMessages = baseDoubts.map((doubt: any) => ({
-                id: doubt.id,
-                title: doubt.title,
-                description: doubt.description,
-                status: doubt.status,
-                resolved: Boolean(doubt.resolved),
-                date: doubt.date,
-                messages: Array.isArray(doubt.messages) ? doubt.messages : []
-              }) as DoubtItem);
-
-              return {
-                contentId: content.id,
-                contentTitle: content.title,
-                contentType: content.type,
-                doubts: doubtsWithMessages
-              };
-            })
-          );
-
-          return {
-            moduleId: module.id,
-            moduleName: module.name,
-            contents: contentGroups
-          } as ModuleGroup;
-        })
-      );
-
-      setGroups(moduleGroups);
+      setError('');
+      const aggregate = await ai.listCourseDoubts(courseId);
+      setGroups((aggregate.modules || []).map(module => ({
+        moduleId: module.id,
+        moduleName: module.name,
+        contents: module.contents.map(content => ({
+          contentId: content.id,
+          contentTitle: content.title,
+          contentType: content.type === 'video' ? 'video' as const : 'study-material' as const,
+          doubts: content.doubts.map(doubt => ({
+            id: doubt.id,
+            title: doubt.title,
+            description: doubt.description,
+            status: doubt.status,
+            resolved: doubt.status === 'resolved',
+            date: '',
+            messages: doubt.messages
+          }))
+        }))
+      })));
     } catch (error) {
       console.error('Error fetching course module doubts:', error);
-      toast.error('Failed to load doubts');
+      setError('Doubts could not be loaded.');
     } finally {
       setLoading(false);
     }
@@ -145,6 +96,10 @@ export default function CourseModuleDoubts({
         <Loader2 className="w-8 h-8 animate-spin text-white" />
       </div>
     );
+  }
+
+  if (error) {
+    return <div className="py-8" role="alert"><p className="text-[var(--muted-ink)]">{error}</p><button type="button" className="underline mt-3" onClick={fetchAll}>Retry</button></div>;
   }
 
   if (groups.length === 0 || totalDoubts === 0) {

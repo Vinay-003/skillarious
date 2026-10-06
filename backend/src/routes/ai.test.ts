@@ -1,15 +1,15 @@
 import request from 'supertest';
 import express from 'express';
 import { beforeEach, expect, it, vi } from 'vitest';
-const state = vi.hoisted(() => ({ access: null as string | null, downloads: vi.fn(), answer: vi.fn() }));
+const state = vi.hoisted(() => ({ access: null as string | null, downloads: vi.fn(), answer: vi.fn(), rows: [] as any[], updated: vi.fn() }));
 vi.mock('../controllers/Auth.ts', () => ({ authenticateUser: (req: any, _res: any, next: any) => { req.user = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }; next(); } }));
 vi.mock('../utils/access.ts', () => ({ getCourseForContent: async () => 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', getContentAccess: async () => state.access }));
 vi.mock('../utils/storage.ts', () => ({ downloadMedia: state.downloads }));
-vi.mock('../db/index.ts', () => ({ db: { select: () => { const builder: any = { from: () => builder, where: () => builder, limit: async () => [{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', title: 'Biology', description: 'Photosynthesis', fileUrl: 'storage://course-content/2026-10/note.txt' }] }; return builder; } } }));
+vi.mock('../db/index.ts', () => ({ db: { select: () => { const builder: any = { from: () => builder, where: () => builder, orderBy: () => builder, innerJoin: () => builder, leftJoin: () => builder, limit: async () => state.rows.length ? state.rows : [{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', title: 'Biology', description: 'Photosynthesis', fileUrl: 'storage://course-content/2026-10/note.txt' }], then: (resolve: any) => resolve(state.rows) }; return builder; }, update: () => ({ set: () => ({ where: () => ({ returning: state.updated }) }) }) } }));
 vi.mock('../utils/learningAI.ts', async importOriginal => ({ ...await importOriginal<any>(), requestLearningAnswer: state.answer }));
 import aiRoute from './ai.ts';
 const app = express(); app.use(express.json()); app.use(aiRoute);
-beforeEach(() => { state.access = null; state.downloads.mockReset(); state.answer.mockReset(); });
+beforeEach(() => { state.access = null; state.rows = []; state.downloads.mockReset(); state.answer.mockReset(); state.updated.mockReset(); });
 it('denies unauthorized private notes before download or provider call', async () => {
   const result = await request(app).post('/ask').send({ contentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', question: 'Explain photosynthesis' });
   expect(result.status).toBe(403); expect(state.downloads).not.toHaveBeenCalled(); expect(state.answer).not.toHaveBeenCalled();
@@ -23,4 +23,16 @@ it('returns authorized text-only context and server-generated read references', 
   const result = await request(app).post('/ask').send({ contentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', question: 'Explain photosynthesis' });
   expect(result.status).toBe(200); expect(result.body.sources.length).toBeGreaterThan(0); expect(result.body.toolReferences[0].access).toBe('enrolled');
   expect(state.answer.mock.calls[0][1][0].text).toContain('Photosynthesis');
+});
+it('lists signed-in user conversations across contexts and supports archived selection', async () => {
+  state.rows = [{ id: 'one', contextType: 'catalog', archived: true }, { id: 'two', contextType: 'doubt', archived: false }];
+  const result = await request(app).get('/conversations?includeArchived=true');
+  expect(result.status).toBe(200);
+  expect(result.body.conversations).toHaveLength(2);
+});
+it('restores an owned conversation', async () => {
+  state.updated.mockResolvedValue([{ id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', archived: false }]);
+  const result = await request(app).post('/conversations/cccccccc-cccc-4ccc-8ccc-cccccccccccc/restore');
+  expect(result.status).toBe(200);
+  expect(result.body.conversation.archived).toBe(false);
 });

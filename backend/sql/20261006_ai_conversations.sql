@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS ai_conversations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  context_type text NOT NULL CHECK (context_type IN ('course', 'content', 'doubt')),
+  context_type text NOT NULL CHECK (context_type IN ('catalog', 'course', 'content', 'doubt')),
   context_id uuid NOT NULL,
   title text NOT NULL CHECK (length(btrim(title)) BETWEEN 1 AND 200),
   archived boolean NOT NULL DEFAULT false,
@@ -20,3 +20,8 @@ CREATE TABLE IF NOT EXISTS ai_messages (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ai_messages_conversation_id_idx ON ai_messages(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS ai_conversations_user_updated_idx ON ai_conversations(user_id, updated_at DESC);
+-- Existing installations originally accepted only course/content/doubt.
+ALTER TABLE ai_conversations DROP CONSTRAINT IF EXISTS ai_conversations_context_type_check;
+ALTER TABLE ai_conversations DROP CONSTRAINT IF EXISTS ai_conversations_context_type_valid;
+ALTER TABLE ai_conversations ADD CONSTRAINT ai_conversations_context_type_valid CHECK (context_type IN ('catalog', 'course', 'content', 'doubt'));
