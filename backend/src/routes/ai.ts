@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from 'express';
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { authenticateUser } from '../controllers/Auth.ts';
 import { db } from '../db/index.ts';
-import { coursesTable, contentTable, modulesTable, doubtsTable, messagesTable, educatorsTable, usersTable, reviewsTable, aiConversationsTable, aiMessagesTable } from '../db/schema.ts';
+import { coursesTable, contentTable, modulesTable, doubtsTable, messagesTable, educatorsTable, usersTable, reviewsTable, transactionsTable, aiConversationsTable, aiMessagesTable } from '../db/schema.ts';
 import { getContentAccess, getCourseForContent } from '../utils/access.ts';
 import { downloadMedia } from '../utils/storage.ts';
 import { LearningError, rankCourses, requestLearningAnswer, retrieveExcerpts, validateQuestion } from '../utils/learningAI.ts';
@@ -129,6 +129,19 @@ router.post('/ask', async (req: AuthRequest, res) => {
 });
 
 const conversationSchema = z.object({ contextType: z.enum(['catalog', 'course', 'content', 'doubt']), contextId: z.string().uuid(), title: z.string().trim().min(1).max(200), forceNew: z.boolean().optional() }).strict();
+router.get('/contexts', async (req: AuthRequest, res) => {
+  try {
+    const publicCourses = await db.select({ id: coursesTable.id, name: coursesTable.name, description: coursesTable.description, about: coursesTable.about, educatorName: usersTable.name }).from(coursesTable)
+      .innerJoin(educatorsTable, eq(coursesTable.educatorId, educatorsTable.id)).innerJoin(usersTable, eq(educatorsTable.userId, usersTable.id))
+      .where(and(eq(coursesTable.isDismissed, false), eq(usersTable.isBanned, false))).orderBy(coursesTable.name).limit(100);
+    const authorizedContent = await db.select({ id: contentTable.id, title: contentTable.title, type: contentTable.type, courseId: coursesTable.id, courseName: coursesTable.name }).from(contentTable)
+      .innerJoin(modulesTable, eq(contentTable.moduleId, modulesTable.id)).innerJoin(coursesTable, eq(modulesTable.courseId, coursesTable.id))
+      .innerJoin(educatorsTable, eq(coursesTable.educatorId, educatorsTable.id)).innerJoin(usersTable, eq(educatorsTable.userId, usersTable.id))
+      .leftJoin(transactionsTable, and(eq(transactionsTable.userId, req.user!.id), eq(transactionsTable.courseId, coursesTable.id), eq(transactionsTable.status, 'completed')))
+      .where(and(eq(contentTable.isDismissed, false), eq(coursesTable.isDismissed, false), or(eq(usersTable.id, req.user!.id), eq(transactionsTable.userId, req.user!.id)))).orderBy(coursesTable.name, contentTable.order).limit(300);
+    return res.json({ success: true, publicCourses, authorizedContent });
+  } catch (error) { return fail(res, error); }
+});
 router.get('/conversations', async (req: AuthRequest, res) => {
   try {
     const contextType = typeof req.query.contextType === 'string' ? req.query.contextType : undefined;
