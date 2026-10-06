@@ -22,7 +22,9 @@ export default function ClassVideosPage() {
     const [classes, setClasses] = useState<Class[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
+     const [expandedClassId, setExpandedClassId] = useState<string | null>(null);
+     const [streamUrls, setStreamUrls] = useState<Record<string, string>>({});
+     const [loadingVideoId, setLoadingVideoId] = useState<string | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [videoProgress, setVideoProgress] = useState<{[key: string]: number}>({});
@@ -129,8 +131,24 @@ export default function ClassVideosPage() {
         }
     };
 
-    const toggleClassExpansion = (classId: string) => {
-        setExpandedClassId(expandedClassId === classId ? null : classId);
+    const toggleClassExpansion = async (classId: string) => {
+        if (expandedClassId === classId) {
+            setExpandedClassId(null);
+            return;
+        }
+        setExpandedClassId(classId);
+        if (streamUrls[classId]) return;
+        setLoadingVideoId(classId);
+        try {
+            const response = await ContentService.getClassStreamUrl(classId);
+            if (!response.success || !response.data?.fileUrl) throw new Error(response.message || 'Video unavailable');
+            setStreamUrls(previous => ({ ...previous, [classId]: response.data.fileUrl }));
+        } catch (error: any) {
+            setExpandedClassId(null);
+            toast.error(error.response?.data?.message || error.message || 'Video could not be opened');
+        } finally {
+            setLoadingVideoId(null);
+        }
     };
 
     if (loading) {
@@ -145,7 +163,7 @@ export default function ClassVideosPage() {
         <div className="container mx-auto px-4 py-8">
             <div className="max-w-4xl mx-auto">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-bold text-white">Module Videos</h1>
+                     <h1 className="text-3xl font-bold text-[var(--ink)]">Module Videos</h1>
                     
                     {/* Only show upload button for educators/admins */}
                     {(user?.isEducator || user?.isAdmin) && (
@@ -158,7 +176,7 @@ export default function ClassVideosPage() {
                                 buttonText="Upload New Class"
                             />
                             {isUploading && (
-                                <div className="flex items-center gap-2 text-white">
+                                 <div className="flex items-center gap-2 text-[var(--ink)]">
                                     <span>Uploading... {uploadProgress}%</span>
                                 </div>
                             )}
@@ -168,7 +186,7 @@ export default function ClassVideosPage() {
 
                 <div className="space-y-4">
                     {classes.map((cls) => (
-                        <div key={cls.id} className="bg-gray-800 rounded-lg overflow-hidden">
+                         <div key={cls.id} className="bg-[var(--surface)] border border-[var(--line)] rounded-lg overflow-hidden">
                             <div className="flex justify-between items-center p-4">
                                 <div 
                                     className="flex items-center space-x-4 cursor-pointer flex-1"
@@ -184,9 +202,9 @@ export default function ClassVideosPage() {
                                         />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-medium text-white">Video {cls.order || 1}</h3>
-                                        <p className="text-sm text-gray-400">Views: {cls.views}</p>
-                                        <p className="text-sm text-gray-400">
+                                         <h3 className="text-lg font-medium text-[var(--ink)]">{cls.title || `Video ${cls.order || 1}`}</h3>
+                                         <p className="text-sm text-[var(--muted-ink)]">Views: {cls.views}</p>
+                                         <p className="text-sm text-[var(--muted-ink)]">
                                             Duration: {cls.duration ? new Date(cls.duration).toISOString().substr(11, 8) : 'N/A'}
                                         </p>
                                     </div>
@@ -209,20 +227,22 @@ export default function ClassVideosPage() {
                                 )}
                             </div>
 
-                            {expandedClassId === cls.id && (
-                                <div className="p-4 border-t border-gray-700">
-                                    <video
-                                        ref={videoRef}
-                                        controls
-                                        className="w-full rounded-lg"
-                                        src={resolveMediaUrl(cls.fileUrl)}
-                                        onTimeUpdate={() => handleTimeUpdate(cls.id)}
-                                    >
-                                        Your browser does not support the video tag.
-                                    </video>
-                                    <div className="mt-2 w-full bg-gray-700 rounded-full h-2.5">
+                             {expandedClassId === cls.id && (
+                                 <div className="p-4 border-t border-[var(--line)]">
+                                     {loadingVideoId === cls.id && <div className="flex items-center gap-2 py-8 justify-center text-[var(--muted-ink)]" role="status"><Loader2 className="animate-spin" /> Loading video…</div>}
+                                     {streamUrls[cls.id] && <video
+                                         ref={videoRef}
+                                         controls
+                                         preload="none"
+                                         className="w-full rounded-lg"
+                                         src={resolveMediaUrl(streamUrls[cls.id])}
+                                         onTimeUpdate={() => handleTimeUpdate(cls.id)}
+                                     >
+                                         Your browser does not support the video tag.
+                                     </video>}
+                                     <div className="mt-2 w-full bg-[var(--line)] rounded-full h-2.5">
                                         <div 
-                                            className="bg-blue-600 h-2.5 rounded-full" 
+                                             className="bg-[var(--forest)] h-2.5 rounded-full"
                                             style={{width: `${videoProgress[cls.id] || 0}%`}}
                                         ></div>
                                     </div>
@@ -241,7 +261,7 @@ export default function ClassVideosPage() {
 
                     {classes.length === 0 && (
                         <div className="text-center py-8">
-                            <p className="text-gray-400">No videos available for this module.</p>
+                            <p className="text-[var(--muted-ink)]">No videos available for this module.</p>
                         </div>
                     )}
                 </div>
@@ -249,9 +269,6 @@ export default function ClassVideosPage() {
         </div>
     );
 }
-
-
-
 
 
 

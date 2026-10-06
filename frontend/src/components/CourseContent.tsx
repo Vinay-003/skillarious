@@ -89,7 +89,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
     <div className="space-y-4">
       <LearningAssistant courseId={courseId} title="Ask about this course" />
       {modules.map((module) => (
-        <div key={module.id} className="bg-gray-800 rounded-lg overflow-hidden">
+        <div key={module.id} className="bg-[var(--surface)] border border-[var(--line)] rounded-lg overflow-hidden">
           <div 
             className="flex cursor-pointer"
             onClick={() => toggleModuleExpansion(module.id)}
@@ -105,8 +105,8 @@ export default function CourseContent({ courseId }: CourseContentProps) {
             </div>
             <div className="flex-1 p-4">
               <div>
-                <h3 className="text-lg font-medium text-white">{module.name}</h3>
-                <div className="text-sm text-gray-400 mt-1">
+                <h3 className="text-lg font-medium text-[var(--ink)]">{module.name}</h3>
+                <div className="text-sm text-[var(--muted-ink)] mt-1">
                   Duration: {module.duration}h | Videos: {module.videoCount} | Materials: {module.materialCount}
                 </div>
               </div>
@@ -115,20 +115,20 @@ export default function CourseContent({ courseId }: CourseContentProps) {
 
           {/* Expanded content */}
           {expandedModuleId === module.id && (
-            <div className="p-4 bg-gray-700">
+            <div className="p-4 bg-[var(--canvas)]">
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-400">Duration</h4>
-                    <p className="text-white">{module.duration} hours</p>
+                    <h4 className="text-sm font-medium text-[var(--muted-ink)]">Duration</h4>
+                    <p className="text-[var(--ink)]">{module.duration} hours</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-400">Video Count</h4>
-                    <p className="text-white">{module.videoCount} videos</p>
+                    <h4 className="text-sm font-medium text-[var(--muted-ink)]">Video Count</h4>
+                    <p className="text-[var(--ink)]">{module.videoCount} videos</p>
                   </div>
                   <div>
-                    <h4 className="text-sm font-medium text-gray-400">Materials</h4>
-                    <p className="text-white">{module.materialCount} materials</p>
+                    <h4 className="text-sm font-medium text-[var(--muted-ink)]">Materials</h4>
+                    <p className="text-[var(--ink)]">{module.materialCount} materials</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -137,7 +137,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
                       e.stopPropagation();
                       router.push(`/content/studyMaterials/${module.id}`);
                     }}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    className="flex-1 px-4 py-2 bg-[var(--forest)] text-[var(--action-text)] rounded-lg hover:opacity-90"
                   >
                     {isEducator && isCourseOwner ? 'Manage Study Materials' : 'View Study Materials'}
                   </button>
@@ -146,7 +146,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
                       e.stopPropagation();
                       router.push(`/content/class/${module.id}`);
                     }}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    className="flex-1 px-4 py-2 bg-[var(--forest)] text-[var(--action-text)] rounded-lg hover:opacity-90"
                   >
                     {isEducator && isCourseOwner ? 'Manage Videos' : 'View Videos'}
                   </button>
@@ -156,7 +156,7 @@ export default function CourseContent({ courseId }: CourseContentProps) {
                         e.stopPropagation();
                         router.push(`/educator/module/edit/${module.id}`);
                       }}
-                      className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+                      className="flex-1 px-4 py-2 bg-[var(--warning)] text-[var(--status-text)] rounded-lg hover:opacity-90"
                     >
                       Edit Module
                     </button>
@@ -168,14 +168,14 @@ export default function CourseContent({ courseId }: CourseContentProps) {
         </div>
       ))}
       {modules.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
+        <div className="text-center py-8 text-[var(--muted-ink)]">
           No content available for this course yet.
         </div>
       )}
       {isEducator && isCourseOwner && (
         <button
           onClick={() => router.push(`/educator/module/create/${courseId}`)}
-          className="fixed bottom-4 right-4 bg-red-600 text-white p-4 rounded-full hover:bg-red-700"
+          className="fixed bottom-4 right-4 bg-[var(--forest)] text-[var(--action-text)] p-4 rounded-full hover:opacity-90"
         >
           Add New Module
         </button>
@@ -183,5 +183,4 @@ export default function CourseContent({ courseId }: CourseContentProps) {
     </div>
   );
 }
-
 

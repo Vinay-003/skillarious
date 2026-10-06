@@ -19,18 +19,11 @@ export default function StudyMaterialsPage() {
   const [studyMaterials, setStudyMaterials] = useState<StudyMaterial[]>([]);
   const [isEducator, setIsEducator] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<StudyMaterial | null>(null);
+  const [openingMaterialId, setOpeningMaterialId] = useState<string | null>(null);
   const [expandedDoubtMaterialId, setExpandedDoubtMaterialId] = useState<string | null>(null);
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        await checkEducatorStatus();
-        await fetchStudyMaterials();
-      } catch (error) {
-        console.error('Initialization error:', error);
-      }
-    };
-    init();
+    void Promise.all([checkEducatorStatus(), fetchStudyMaterials()]);
   }, [params.moduleId]);
 
   const checkEducatorStatus = async () => {
@@ -98,6 +91,19 @@ export default function StudyMaterialsPage() {
     }
   };
 
+  const openMaterial = async (material: StudyMaterial) => {
+    setOpeningMaterialId(material.id);
+    try {
+      const response = await contentService.getStudyMaterialUrl(material.id);
+      if (!response.success || !response.data?.fileUrl) throw new Error(response.message || 'Material URL unavailable');
+      setSelectedMaterial({ ...material, fileUrl: response.data.fileUrl });
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message || 'Material could not be opened');
+    } finally {
+      setOpeningMaterialId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -122,13 +128,13 @@ export default function StudyMaterialsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">Study Materials</h1>
+          <h1 className="text-3xl font-bold text-[var(--ink)]">Study Materials</h1>
           
           {/* Add Upload button for educators */}
           {isEducator && (
             <button
               onClick={() => router.push(`/content/materials/upload/${params.moduleId}`)}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              className="px-4 py-2 bg-[var(--forest)] text-[var(--action-text)] rounded-lg hover:opacity-90"
             >
               Upload New Material
             </button>
@@ -136,42 +142,43 @@ export default function StudyMaterialsPage() {
         </div>
 
         {/* Study Materials List */}
-        <div className="bg-gray-800 rounded-lg p-6">
+        <div className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-6">
           {loading ? (
             <div className="flex justify-center">
               <Loader2 className="w-8 h-8 animate-spin" />
             </div>
           ) : studyMaterials.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-[var(--muted-ink)]">
               No study materials available for this module.
             </div>
           ) : (
             <div className="space-y-4">
               {studyMaterials.map((material) => (
-                <div key={material.id} className="bg-gray-700 rounded-lg p-4">
+                <div key={material.id} className="bg-[var(--canvas)] border border-[var(--line)] rounded-lg p-4">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h3 className="text-lg font-medium text-white">
+                      <h3 className="text-lg font-medium text-[var(--ink)]">
                         {material.title}
                       </h3>
                       {material.description && (
-                        <p className="text-sm text-gray-400 mt-1">
+                        <p className="text-sm text-[var(--muted-ink)] mt-1">
                           {material.description}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setSelectedMaterial(material)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        onClick={() => openMaterial(material)}
+                        disabled={openingMaterialId === material.id}
+                        className="studio-button disabled:opacity-50"
                       >
-                        View Material
+                        {openingMaterialId === material.id ? 'Opening…' : 'View Material'}
                       </button>
                       <button
                         onClick={() =>
                           setExpandedDoubtMaterialId((prev) => (prev === material.id ? null : material.id))
                         }
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500"
+                        className="px-4 py-2 border border-[var(--line)] text-[var(--ink)] rounded-lg hover:bg-[var(--paper)]"
                       >
                         {expandedDoubtMaterialId === material.id ? 'Hide Doubts' : 'Doubts'}
                       </button>

@@ -1,4 +1,109 @@
-# Skillarious restoration and redesign plan
+# Skillarious product reliability and learning experience plan
+
+> Updated 2026-10-06. This is the execution plan for the issues reported in the latest course, AI, doubts, media, theme, performance, and Git-history review. The implementation should be delivered in small, testable slices; no fake success states or unsupported provider capabilities.
+
+## 0. Non-negotiable safety decisions
+
+- Do not print, copy, or commit values from any environment file.
+- Current working-tree environment files remain ignored and are not tracked at `HEAD`.
+- Historical environment blobs are still sensitive. Rewriting history only removes references from reachable Git refs; it does not revoke credentials or erase existing clones, GitHub caches, alerts, email notifications, forks, or provider logs. The safe order is revoke/rotate first, then rewrite.
+- The user requested no rotation. Therefore no credential rotation is part of this implementation. Do not claim the credentials are safe after history cleanup.
+- Never force-push `main`/`master`. If history cleanup is approved, create a sanitized replacement branch and require an explicit repository-owner migration decision; do not silently overwrite the protected/default branch.
+
+## 1. Observed problems and likely causes
+
+### AI sometimes works and sometimes fails
+
+- The frontend keeps only one answer in React state and has no conversation persistence.
+- `/ai/ask` currently sends text-only excerpts to APInex, falls back once from DeepSeek to MiMo, and returns a generic 503 when both attempts fail. It does not persist a request ID/model attempt or distinguish provider outage, quota, malformed response, unsupported modality, and context retrieval errors.
+- Course context currently contains course fields but not educator identity/about. Content context is authorized, but PDFs are parsed only on demand and image/video bytes are never analyzed.
+- Intermittent failures must be diagnosed from redacted request/model/status/duration events, never provider response bodies, prompts, keys, signed URLs, or student text.
+
+### Doubts disappear or show incomplete data
+
+- A student can see their own doubts; educators can see course doubts. A student cannot see other students' doubts by design. Make that rule explicit in the UI.
+- The content doubt list makes one request per doubt for messages and silently converts detail failures into an empty message list.
+- After creation, the refresh is not awaited. Expansion/unmounting can also destroy local state.
+- The course-level doubts screen has an N+1 request pattern across modules, videos, materials, doubts, and detail messages.
+
+### Theme and controls are inconsistent
+
+- `app/globals.css` contains two token systems plus broad legacy utility overrides.
+- Components still use hard-coded blue/green/yellow/red and `text-white`, causing low contrast in one of the two themes. Status colors and action colors need semantic tokens, not color names.
+
+### Content and loading are too heavy
+
+- Course detail, rating, enrollment, library, modules, media, signed URLs, doubts, and assistant UI are not consistently separated into critical and background work.
+- Video and study-material endpoints currently sign every file URL before the user opens anything.
+- Study Materials must render documents/notes/images/text only. Video playback belongs in the separate Videos/Class area.
+
+## 2. Delivery phases
+
+### Phase A — stabilize and instrument the current AI path
+
+1. Add a redacted AI request telemetry record: request ID, user/course/content context type, selected model, fallback attempt, HTTP status category, duration, and failure category. Never log question text, excerpts, keys, provider bodies, or signed URLs.
+2. Preserve authorization before retrieval: course overview is public; content, material, video, and doubt context require enrollment or educator ownership.
+3. Expand public course context with educator name/bio/about and add a bounded public-catalog context for questions about other published courses and teachers. Retrieve only non-dismissed course/educator fields, cite the matched catalog records, and never expose private educator data, enrolled-only materials, or student data.
+4. Keep DeepSeek on text-only inputs. Keep MiMo text-only until APInex's live model contract proves the accepted multimodal payload.
+5. Add tests for primary success, fallback success, both unavailable, provider timeout, malformed response, quota/busy state, unauthorized context, and context retrieval failure. Return truthful retry/unsupported messages instead of a generic success.
+
+### Phase B — provider capability verification and grounded insights
+
+1. At deploy time, inspect the APInex model catalog and run a disposable capability probe with no private course data. The catalog currently lists `free/mimo-v2.6-pro` and `free/deepseek-v4.1-flash`, but it does not expose reliable per-model modality fields in the response we can safely depend on.
+2. Treat MiMo as potentially multimodal based on its upstream model documentation, but do not assume APInex's OpenAI-compatible bridge accepts PDF/video parts. Verify exact syntax and limits from APInex, not a different gateway.
+3. PDFs: keep bounded text extraction for text PDFs. Detect scanned/image-only PDFs; add OCR as an asynchronous derived-text step with page citations. Do not send arbitrary storage URLs to the model.
+4. Images: only send authorized, validated images to a confirmed vision-capable provider using provider-specific content parts. Enforce MIME, byte, pixel, image-count, and privacy limits.
+5. Videos: never send full lectures synchronously. Add an asynchronous job that extracts audio transcripts, representative frames/slide OCR, timestamps, and summaries. Let DeepSeek answer from transcript text; use MiMo frames only after capability verification. Keep raw video private and cite timestamps.
+6. Normalize evidence as bounded records: source ID, type, content, page/timestamp, access scope, version/checksum. Unsupported combinations return a clear 422-style UI state.
+
+### Phase C — persistent AI chats and Ask AI entry points
+
+1. Add durable `ai_conversations` and `ai_messages` tables keyed by student and context (`course`, `content`, or `doubt`), with created/updated timestamps, title, archived state, message role, bounded text, model metadata, and source references.
+2. Add authenticated list/create/read/archive endpoints. Enforce ownership by student; educators cannot read private student AI chats unless an explicit future policy grants it.
+3. Change `LearningAssistant` from one `result` to a chat thread: load previous messages, show an Ask AI button on course overview, material detail, video detail, and doubt detail, append the new turn, show sources/disclosure, retry failed turns, and preserve chats across refresh/navigation.
+4. Use one conversation implementation. Remove or connect the older local-only `ChatBox` so there is no second disappearing chat system.
+5. Add pagination/limits and server-side quotas. Never treat browser localStorage as the source of truth for private conversations.
+
+### Phase D — reliable doubts
+
+1. Return the created doubt from the API and insert it immediately, then reconcile with a refresh that is awaited and cancellable.
+2. Add a batch/detail response or include authorized messages in the list response to remove N+1 requests. Surface a retryable detail error instead of silently showing an empty thread.
+3. Keep student visibility limited to the student's own doubts; show an explicit empty state explaining this. Educators see doubts for courses they own.
+4. Preserve thread state in the stable course page or route state; do not rely on a component that is destroyed on collapse.
+5. Add tests for one pasted doubt, refresh, multiple doubts, educator reply, student follow-up, resolution, access denial, and temporary detail failure.
+
+### Phase E — content separation and fast course opening
+
+1. Make course shell/title/navigation render immediately with skeletons; load course metadata on the critical path.
+2. Start independent rating, enrollment, library, module, and educator checks in parallel. Cache course/module results for the current session and cancel stale requests on navigation.
+3. Return content metadata first. Request signed URLs only when a document/image is opened or a video is intentionally started.
+4. Study Materials shows only PDF/TXT/images/other document content. Videos are excluded from that list and remain in the separate Videos/Class section.
+5. Video elements use `preload="none"` or metadata-only behavior. Do not create signed URLs or download full video data until the user presses play; use range-friendly storage/CDN delivery.
+6. Lazy-load PDF/image viewers, video player, doubts, and AI chat. Background-load static metadata after the shell is interactive.
+7. Add performance measurements for first meaningful course shell, metadata ready, material open, and video start; compare before/after instead of guessing.
+
+### Phase F — one accessible light/dark design system
+
+1. Consolidate `app/globals.css` tokens into semantic roles: canvas, surface, text, muted text, border, action, action text, success, warning, danger, info, focus.
+2. Replace hard-coded status/action utilities with semantic classes or CSS variables. Check every button, tab, badge, spinner, textarea, select, link, progress bar, and error state in both themes.
+3. Add contrast-focused browser checks for the reported course, AI, doubts, reviews, material, and video screens at desktop and mobile widths.
+4. Keep keyboard focus, disabled state, reduced motion, and visible loading/error states intact.
+
+## 3. Verification gates
+
+- Backend typecheck and unit/API tests pass with no secrets printed.
+- Frontend typecheck, lint, production build, and focused Playwright flows pass.
+- New tests cover AI fallback/capabilities, persistent chat ownership, one-doubt creation/reload, authorization, both themes, lazy media loading, and course shell responsiveness.
+- A redacted endpoint matrix records pass/fail/blocked status. Live provider tests use synthetic text only unless a confirmed, disposable multimodal probe is explicitly enabled.
+- Before any deployment: `git diff --check`, tracked-secret scan, ignored-env check, and review of staged paths. Do not stage existing user files automatically.
+
+## 4. Git history cleanup decision
+
+- Historical env paths were removed from the current tree, but reachable old commits still contain them.
+- `gh` is not installed in this worker, so GitHub authentication and remote branch mutation cannot be verified here.
+- A history rewrite can be prepared locally with `git filter-repo`/BFG after a clean worktree snapshot, but it must not force-push `main`. The safe GitHub procedure is: authenticate with GitHub, create a sanitized replacement branch, have the repository owner review it, change the default branch/branch protections, then retire old refs and rotate credentials. Skipping rotation leaves the leaked credentials usable.
+
+# Historical restoration notes
 
 ## Goal and implementation order
 Restore the existing Next.js + Express + Drizzle application without changing its core stack. Supabase Postgres and Storage are the durable data services; PayPal Sandbox replaces Razorpay; a server-side APInex learning assistant supports notes, lessons, doubts, course explanations and course discovery. Verify locally before GitHub/hosting deployment.

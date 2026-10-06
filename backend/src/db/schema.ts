@@ -258,6 +258,28 @@ export const adminLogsTable = pgTable('admin_logs', {
 export type InsertAdminLog = typeof adminLogsTable.$inferInsert;
 export type SelectAdminLog = typeof adminLogsTable.$inferSelect;
 
+// Persistent, private learning assistant conversations.
+export const aiConversationsTable = pgTable('ai_conversations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => usersTable.id),
+  contextType: text('context_type').notNull(),
+  contextId: uuid('context_id').notNull(),
+  title: text('title').notNull(),
+  archived: boolean('archived').notNull().default(false),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, t => ({ ownerIdx: index('ai_conversations_user_id_idx').on(t.userId), contextIdx: index('ai_conversations_context_idx').on(t.contextType, t.contextId) }));
+
+export const aiMessagesTable = pgTable('ai_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => aiConversationsTable.id),
+  role: text('role').notNull(),
+  content: text('content').notNull(),
+  model: text('model'),
+  sources: json('sources'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, t => ({ conversationIdx: index('ai_messages_conversation_id_idx').on(t.conversationId) }));
+
 export const adminInvitesTable = pgTable('admin_invites', {
   id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
   email: text('email').notNull(),

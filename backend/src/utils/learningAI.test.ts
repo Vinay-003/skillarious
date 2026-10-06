@@ -22,6 +22,19 @@ describe('learning AI boundary', () => {
     expect(payloads.every(p => p.model.startsWith('free/') && !p.tools)).toBe(true);
     await expect(requestLearningAnswer('question', [], { apiKey: 'test', primary: 'paid/model' })).rejects.toThrow();
   });
+  it('keeps bounded conversation history as text-only provider context', async () => {
+    const { requestLearningAnswer } = await import('./learningAI.ts');
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: 'Answer [notes:1].' } }] })));
+    await requestLearningAnswer('Follow up', [{ id: 'notes:1', text: 'A function returns a value.' }], {
+      apiKey: 'test-only',
+      fetcher,
+      history: [{ role: 'user', content: 'What is a function?' }, { role: 'assistant', content: 'A reusable block of code.' }]
+    });
+    const payload = JSON.parse(fetcher.mock.calls[0][1].body);
+    expect(payload.messages.map((message: { role: string }) => message.role)).toEqual(['system', 'user', 'assistant', 'user']);
+    expect(payload.messages.at(-1).content).toContain('Follow up');
+    expect(payload.messages.some((message: { content: string }) => message.content.includes('apiKey'))).toBe(false);
+  });
   it('smooths ratings and excludes irrelevant courses', async () => {
     const { rankCourses } = await import('./learningAI.ts');
     const result = rankCourses([

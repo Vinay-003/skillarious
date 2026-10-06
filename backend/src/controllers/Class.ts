@@ -284,7 +284,8 @@ export const getModuleClasses = async (req: AuthenticatedRequest, res: Response)
 
     return res.status(200).json({
       success: true,
-      data: await Promise.all(classes.map(async item => ({ ...item, fileUrl: await getSignedMediaUrl(item.fileUrl) })))
+      // Do not sign every lecture while opening a module. The player requests its URL on demand.
+      data: classes
     });
   } catch (error) {
     console.error('Error fetching module classes:', error);
@@ -293,6 +294,19 @@ export const getModuleClasses = async (req: AuthenticatedRequest, res: Response)
       message: 'Error fetching module classes'
     });
   }
+};
+
+export const getClassStreamUrl = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { contentId } = req.params;
+    if (!isUuid(contentId)) return res.status(400).json({ success: false, message: 'Invalid content ID' });
+    const courseId = await getCourseForContent(contentId);
+    if (!courseId || !await getContentAccess(req.user.id, courseId)) return res.status(403).json({ success: false, message: 'Access denied' });
+    const [content] = await db.select({ id: contentTable.id, fileUrl: contentTable.fileUrl }).from(contentTable)
+      .where(and(eq(contentTable.id, contentId), eq(contentTable.type, 'video'))).limit(1);
+    if (!content) return res.status(404).json({ success: false, message: 'Class not found' });
+    return res.json({ success: true, data: { id: content.id, fileUrl: await getSignedMediaUrl(content.fileUrl) } });
+  } catch { return res.status(500).json({ success: false, message: 'Failed to sign class URL' }); }
 };
 
 export const uploadContent = async (req: AuthenticatedRequest, res: Response) => {
@@ -343,7 +357,6 @@ export const uploadContent = async (req: AuthenticatedRequest, res: Response) =>
     });
   }
 };
-
 
 
 

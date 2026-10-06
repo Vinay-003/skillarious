@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/index.ts';
 import { doubtsTable, messagesTable } from '../db/schema.ts';
 import { getContentAccess, getCourseForContent, isUuid } from '../utils/access.ts';
@@ -12,6 +12,14 @@ function fail(res: Response, error: unknown, message: string) {
   return res.status(error instanceof DoubtFailure ? error.status : 500).json({ success: false, message: error instanceof DoubtFailure ? error.message : message });
 }
 const fields = { id: doubtsTable.id, fileId: doubtsTable.fileId, classId: doubtsTable.classId, date: doubtsTable.date, educatorAssigned: doubtsTable.educatorAssigned, resolved: doubtsTable.resolved, userId: doubtsTable.userId, contentId: doubtsTable.contentId, title: doubtsTable.title, description: doubtsTable.description, status: doubtsTable.status };
+
+async function withMessages<T extends { id: string }>(doubts: T[]) {
+  if (!doubts.length) return doubts.map(doubt => ({ ...doubt, messages: [] }));
+  const messages = await db.select().from(messagesTable).where(inArray(messagesTable.doubtId, doubts.map(doubt => doubt.id)));
+  const byDoubt = new Map<string, typeof messages>();
+  for (const message of messages) byDoubt.set(message.doubtId, [...(byDoubt.get(message.doubtId) || []), message]);
+  return doubts.map(doubt => ({ ...doubt, messages: byDoubt.get(doubt.id) || [] }));
+}
 
 async function allowed(req: AuthRequest, doubt: typeof doubtsTable.$inferSelect) {
   if (doubt.userId === req.user?.id) return true;
@@ -40,7 +48,7 @@ export async function getDoubtsByContent(req: AuthRequest, res: Response) {
     const access = await getContentAccess(req.user!.id, courseId);
     if (!access) return res.status(403).json({ success: false, message: 'Access denied' });
     const doubts = await db.select(fields).from(doubtsTable).where(access === 'owner' ? eq(doubtsTable.contentId, contentId) : and(eq(doubtsTable.contentId, contentId), eq(doubtsTable.userId, req.user!.id))).orderBy(desc(doubtsTable.date));
-    return res.json({ success: true, doubts });
+    return res.json({ success: true, doubts: await withMessages(doubts) });
   } catch (error) { return fail(res, error, 'Error fetching doubts'); }
 }
 
@@ -49,7 +57,7 @@ export async function getDoubts(req: AuthRequest, res: Response) {
     const filter = String(req.query.filter || '');
     if (filter && !['all', 'open', 'resolved'].includes(filter)) return res.status(400).json({ success: false, message: 'Invalid filter' });
     const doubts = await db.select(fields).from(doubtsTable).where(and(eq(doubtsTable.userId, req.user!.id), ...(['open', 'resolved'].includes(filter) ? [eq(doubtsTable.resolved, filter === 'resolved')] : []))).orderBy(desc(doubtsTable.date));
-    return res.json({ success: true, doubts });
+    return res.json({ success: true, doubts: await withMessages(doubts) });
   } catch (error) { return fail(res, error, 'Error fetching doubts'); }
 }
 

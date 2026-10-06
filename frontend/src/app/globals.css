@@ -120,3 +120,10 @@ html { scroll-behavior:smooth; } body { background:var(--canvas); color:var(--in
 .studio-button:disabled { opacity:.55; cursor:not-allowed; transform:none; }
 .site-footer { background:#14251b; color:#eceee4; }
 .site-footer .brand-mark { background:#eceee4; color:#14251b!important; }
+:root { --surface:var(--paper); --action-text:#f7f5ee; --success:#2f6f4e; --warning:#a66a16; --danger:#a33b31; --info:#35698f; --status-text:#ffffff; }
+.dark { --surface:var(--paper); --action-text:#17241b; --success:#8fc7a4; --warning:#e8bd72; --danger:#ef9a8e; --info:#8fc4e5; --status-text:#17241b; }
+.bg-green-600 { background-color:var(--success)!important; }
+.bg-yellow-600 { background-color:var(--warning)!important; }
+.bg-blue-600 { background-color:var(--info)!important; }
+.bg-green-600.text-white,.bg-yellow-600.text-white,.bg-blue-600.text-white { color:var(--status-text)!important; }
+.text-green-600,.text-yellow-600,.text-blue-600 { color:var(--forest)!important; }

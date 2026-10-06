@@ -44,20 +44,20 @@ export default function DoubtDetails({ doubtId }: DoubtDetailsProps) {
   }
 
   if (!doubt) {
-    return <div className="text-white">Doubt not found</div>;
+    return <div className="text-[var(--ink)]">Doubt not found</div>;
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-6">
-      <h2 className="text-xl font-bold text-white mb-2">{doubt.title}</h2>
-      <p className="text-gray-300 mb-4">{doubt.description}</p>
+    <div className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-6">
+      <h2 className="text-xl font-bold text-[var(--ink)] mb-2">{doubt.title}</h2>
+      <p className="text-[var(--muted-ink)] mb-4">{doubt.description}</p>
       
       <div className="space-y-4 mt-6">
-        <h3 className="text-lg font-semibold text-white">Responses</h3>
+        <h3 className="text-lg font-semibold text-[var(--ink)]">Responses</h3>
         {messages.map((message) => (
-          <div key={message.id} className="bg-gray-700 p-4 rounded-lg">
-            <p className="text-white">{message.text}</p>
-            <p className="text-sm text-gray-400 mt-2">
+          <div key={message.id} className="bg-[var(--canvas)] border border-[var(--line)] p-4 rounded-lg">
+            <p className="text-[var(--ink)]">{message.text}</p>
+            <p className="text-sm text-[var(--muted-ink)] mt-2">
               {message.isResponse ? 'Educator' : 'Student'}
             </p>
           </div>

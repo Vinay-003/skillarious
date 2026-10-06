@@ -8,7 +8,6 @@ services:
     autoDeploy: false
     buildCommand: npm ci --include=dev && npm run typecheck
     startCommand: npm start
-    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: "24"

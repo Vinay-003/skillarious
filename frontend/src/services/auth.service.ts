@@ -135,7 +135,7 @@ class AuthService {
     } catch { /* Local session is already cleared even when revocation fails. */ }
   }
 
-  setTokens(data: AuthResponse) {
+  setTokens(data: Pick<AuthResponse, 'accessToken' | 'refreshToken'>) {
     const secure = window.location.protocol === 'https:' ? '; Secure' : '';
     document.cookie = `accessToken=${data.accessToken}; path=/; SameSite=Lax; Max-Age=900${secure}`;
     document.cookie = `refreshToken=${data.refreshToken}; path=/; SameSite=Lax; Max-Age=604800${secure}`;

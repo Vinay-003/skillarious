@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MessageSquare, Plus } from 'lucide-react';
+import { MessageSquare, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { doubtService } from '@/services/doubt.service';
 import DoubtReply from '@/components/DoubtReply';
@@ -56,24 +56,7 @@ export default function ContentDoubtsThread({
       if (response.success === false) throw new Error(response.message || 'Unable to load questions');
       const baseDoubts = Array.isArray(response?.doubts) ? response.doubts : [];
 
-      const withMessages = await Promise.all(
-        baseDoubts.map(async (doubt: any) => {
-          try {
-            const detail = await doubtService.getDoubtDetails(doubt.id);
-            return {
-              ...doubt,
-              messages: Array.isArray(detail?.doubt?.messages) ? detail.doubt.messages : []
-            } as ContentDoubt;
-          } catch {
-            return {
-              ...doubt,
-              messages: []
-            } as ContentDoubt;
-          }
-        })
-      );
-
-      setDoubts(withMessages);
+      setDoubts(baseDoubts.map((doubt: any) => ({ ...doubt, messages: Array.isArray(doubt.messages) ? doubt.messages : [] })) as ContentDoubt[]);
     } catch (error) {
       setError(true);
       console.error('Failed to fetch doubts by content:', error);
@@ -98,7 +81,7 @@ export default function ContentDoubtsThread({
       setTitle('');
       setDescription('');
       setShowForm(false);
-      fetchDoubts();
+      await fetchDoubts();
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to post doubt');
     } finally {
@@ -107,30 +90,30 @@ export default function ContentDoubtsThread({
   };
 
   return (
-    <div className="mt-4 bg-gray-800/60 rounded-lg p-4 border border-gray-700">
-      <div className="flex justify-between items-center mb-3">
-        <h4 className="text-white font-semibold flex items-center gap-2">
+    <div className="mt-4 bg-[var(--surface)] rounded-lg p-4 border border-[var(--line)]">
+       <div className="flex justify-between items-center mb-3">
+         <h4 className="text-[var(--ink)] font-semibold flex items-center gap-2">
           <MessageSquare className="w-4 h-4" />
           Doubts {contentLabel ? `• ${contentLabel}` : ''}
         </h4>
-        {allowAsk && (
+         <div className="flex gap-2"> <button type="button" onClick={fetchDoubts} className="text-sm px-2 py-1 text-[var(--muted-ink)]" aria-label="Refresh doubts"><RefreshCw className="w-4 h-4" /></button>{allowAsk && (
           <button
             onClick={() => setShowForm((prev) => !prev)}
-            className="text-sm px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 flex items-center gap-1"
+             className="text-sm px-3 py-1 rounded-md bg-[var(--forest)] text-[var(--action-text)] hover:opacity-90 flex items-center gap-1"
           >
             <Plus className="w-4 h-4" /> Ask Doubt
           </button>
-        )}
-      </div>
+         )}</div>
+       </div>
 
       {showForm && (
-        <form onSubmit={handleCreateDoubt} className="space-y-3 mb-4 bg-gray-900 rounded-md p-3">
+         <form onSubmit={handleCreateDoubt} className="space-y-3 mb-4 bg-[var(--canvas)] rounded-md p-3">
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Doubt title"
-            className="w-full px-3 py-2 rounded-md bg-gray-700 text-white"
+             className="w-full px-3 py-2 rounded-md bg-[var(--paper)] text-[var(--ink)] border border-[var(--line)]"
             minLength={5}
             required
           />
@@ -139,7 +122,7 @@ export default function ContentDoubtsThread({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Describe your doubt"
             rows={3}
-            className="w-full px-3 py-2 rounded-md bg-gray-700 text-white"
+             className="w-full px-3 py-2 rounded-md bg-[var(--paper)] text-[var(--ink)] border border-[var(--line)]"
             minLength={10}
             required
           />
@@ -147,14 +130,14 @@ export default function ContentDoubtsThread({
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-3 py-2 text-sm rounded-md bg-gray-700 text-white"
+               className="px-3 py-2 text-sm rounded-md border border-[var(--line)] text-[var(--ink)]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-3 py-2 text-sm rounded-md bg-red-600 text-white disabled:opacity-60"
+               className="px-3 py-2 text-sm rounded-md bg-[var(--forest)] text-[var(--action-text)] disabled:opacity-60"
             >
               {isSubmitting ? 'Posting...' : 'Post Doubt'}
             </button>
@@ -163,15 +146,15 @@ export default function ContentDoubtsThread({
       )}
 
       {error ? <p role="alert" className="text-[var(--muted-ink)]">Questions could not be loaded. Please try again later.</p> : loading ? (
-        <p className="text-gray-400 text-sm">Loading doubts...</p>
+         <p className="text-[var(--muted-ink)] text-sm">Loading doubts...</p>
       ) : doubts.length === 0 ? (
-        <p className="text-gray-400 text-sm">No doubts yet for this content.</p>
-      ) : (
+         <p className="text-[var(--muted-ink)] text-sm">No doubts yet for this content.</p>
+       ) : (
         <div className="space-y-3">
           {doubts.map((doubt) => (
-            <div key={doubt.id} className="bg-gray-700 rounded-md p-3">
+             <div key={doubt.id} className="bg-[var(--paper)] rounded-md p-3 border border-[var(--line)]">
               <div className="flex justify-between gap-3 mb-1">
-                <h5 className="text-white font-medium">{doubt.title}</h5>
+                 <h5 className="text-[var(--ink)] font-medium">{doubt.title}</h5>
                 <span
                   className={`text-xs px-2 py-1 rounded-full ${
                     doubt.resolved || doubt.status === 'answered'
@@ -182,14 +165,14 @@ export default function ContentDoubtsThread({
                   {doubt.resolved || doubt.status === 'answered' ? 'resolved' : 'open'}
                 </span>
               </div>
-              <p className="text-sm text-gray-300">{doubt.description}</p>
+               <p className="text-sm text-[var(--muted-ink)]">{doubt.description}</p>
 
               {doubt.messages.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {doubt.messages.map((message) => (
-                    <div key={message.id} className="bg-gray-800 rounded p-2">
-                      <p className="text-sm text-gray-100">{message.text}</p>
-                      <p className="text-xs text-gray-400 mt-1">
+                     <div key={message.id} className="bg-[var(--canvas)] rounded p-2">
+                       <p className="text-sm text-[var(--ink)]">{message.text}</p>
+                       <p className="text-xs text-[var(--muted-ink)] mt-1">
                         {message.isResponse ? 'Educator response' : 'Student message'}
                       </p>
                     </div>

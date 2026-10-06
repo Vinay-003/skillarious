@@ -2,7 +2,7 @@ import express from 'express';
 import { RequestHandler } from 'express';
 import { createDoubt, replyToDoubt, getRealtimeStatus, getDoubtsByContent, getDoubts, getDoubtDetails, resolveDoubt } from '../controllers/Doubt.ts';
 import { createModule, updateModule, deleteModule, getAllModules } from '../controllers/Module.ts';
-import { uploadStudyMaterial, updateStudyMaterial, deleteStudyMaterial, getModuleStudyMaterials } from '../controllers/StudyMaterial.ts';
+import { uploadStudyMaterial, updateStudyMaterial, deleteStudyMaterial, getModuleStudyMaterials, getStudyMaterialUrl } from '../controllers/StudyMaterial.ts';
 import { createCategory, updateCategory, deleteCategory, getAllCategories, getCategoryBySearch } from '../controllers/Category.ts';
 import { 
     createClass, 
@@ -10,7 +10,8 @@ import {
     updateClass, 
     deleteClass, 
     // getAllClassesOfCourse,
-    getModuleClasses
+    getModuleClasses,
+    getClassStreamUrl
 } from '../controllers/Class.ts';
 import { authenticateUser } from '../controllers/Auth.ts';
 
@@ -37,6 +38,7 @@ router.post('/uploadStudyMaterial', authenticateUser as unknown as RequestHandle
 router.put('/updateStudymaterial/:materialId', authenticateUser as unknown as RequestHandler, updateStudyMaterial as unknown as RequestHandler);
 router.delete('/deleteStudyMaterial/:materialId', authenticateUser as unknown as RequestHandler, deleteStudyMaterial as unknown as RequestHandler);
 router.get('/getModuleStudyMaterials/:moduleId', authenticateUser as unknown as RequestHandler, getModuleStudyMaterials as unknown as RequestHandler);
+router.get('/getStudyMaterialUrl/:materialId', authenticateUser as unknown as RequestHandler, getStudyMaterialUrl as unknown as RequestHandler);
 
 // Category related routes
 router.post('/createCategory', authenticateUser as unknown as RequestHandler, createCategory as unknown as RequestHandler);
@@ -50,11 +52,11 @@ router.get('/searchCategory', getCategoryBySearch as unknown as RequestHandler);
 router.post('/class/:moduleId', authenticateUser as unknown as RequestHandler, createClass as unknown as RequestHandler);
 router.get('/getModuleClasses/:moduleId', authenticateUser as unknown as RequestHandler, getModuleClasses as unknown as RequestHandler);
 router.get('/getClassStream/:contentId', authenticateUser as unknown as RequestHandler, getClassStream as unknown as RequestHandler);
+router.get('/getClassStreamUrl/:contentId', authenticateUser as unknown as RequestHandler, getClassStreamUrl as unknown as RequestHandler);
 router.put('/updateClass/:contentId', authenticateUser as unknown as RequestHandler, updateClass as unknown as RequestHandler);
 router.delete('/deleteClass/:contentId', authenticateUser as unknown as RequestHandler, deleteClass as unknown as RequestHandler);
 
 export default router;
-
 
 
 

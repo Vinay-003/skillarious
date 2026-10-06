@@ -93,20 +93,15 @@ export default function CourseModuleDoubts({
               const doubtsRes = await doubtService.getDoubtsByContent(content.id).catch(() => ({ doubts: [] }));
               const baseDoubts = Array.isArray(doubtsRes?.doubts) ? doubtsRes.doubts : [];
 
-              const doubtsWithMessages = await Promise.all(
-                baseDoubts.map(async (doubt: any) => {
-                  const details = await doubtService.getDoubtDetails(doubt.id).catch(() => ({ doubt: { messages: [] } }));
-                  return {
-                    id: doubt.id,
-                    title: doubt.title,
-                    description: doubt.description,
-                    status: doubt.status,
-                    resolved: Boolean(doubt.resolved),
-                    date: doubt.date,
-                    messages: Array.isArray(details?.doubt?.messages) ? details.doubt.messages : []
-                  } as DoubtItem;
-                })
-              );
+              const doubtsWithMessages = baseDoubts.map((doubt: any) => ({
+                id: doubt.id,
+                title: doubt.title,
+                description: doubt.description,
+                status: doubt.status,
+                resolved: Boolean(doubt.resolved),
+                date: doubt.date,
+                messages: Array.isArray(doubt.messages) ? doubt.messages : []
+              }) as DoubtItem);
 
               return {
                 contentId: content.id,
@@ -159,29 +154,29 @@ export default function CourseModuleDoubts({
   return (
     <div className="space-y-6">
       {groups.map((moduleGroup) => (
-        <div key={moduleGroup.moduleId} className="bg-gray-800 rounded-lg p-5">
-          <h3 className="text-white text-lg font-semibold mb-4">{moduleGroup.moduleName}</h3>
+         <div key={moduleGroup.moduleId} className="bg-[var(--surface)] border border-[var(--line)] rounded-lg p-5">
+           <h3 className="text-[var(--ink)] text-lg font-semibold mb-4">{moduleGroup.moduleName}</h3>
 
           <div className="space-y-4">
             {moduleGroup.contents.map((content) => (
-              <div key={content.contentId} className="bg-gray-700 rounded-md p-4">
+               <div key={content.contentId} className="bg-[var(--canvas)] rounded-md p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-gray-300">
+                   <p className="text-sm text-[var(--muted-ink)]">
                     {content.contentType === 'video' ? 'Video' : 'Study Material'}: {content.contentTitle}
                   </p>
-                  <span className="text-xs px-2 py-1 rounded-full bg-gray-600 text-gray-200">
+                   <span className="text-xs px-2 py-1 rounded-full border border-[var(--line)] text-[var(--muted-ink)]">
                     {content.doubts.length} doubts
                   </span>
                 </div>
 
                 {content.doubts.length === 0 ? (
-                  <p className="text-xs text-gray-400">No doubts for this content.</p>
+                   <p className="text-xs text-[var(--muted-ink)]">No doubts for this content.</p>
                 ) : (
                   <div className="space-y-3">
                     {content.doubts.map((doubt) => (
-                      <div key={doubt.id} className="bg-gray-800 rounded p-3">
+                       <div key={doubt.id} className="bg-[var(--surface)] rounded p-3 border border-[var(--line)]">
                         <div className="flex justify-between gap-3 mb-1">
-                          <h4 className="text-white font-medium flex items-center gap-2">
+                           <h4 className="text-[var(--ink)] font-medium flex items-center gap-2">
                             <MessageSquare className="w-4 h-4 text-red-400" />
                             {doubt.title}
                           </h4>
@@ -195,14 +190,14 @@ export default function CourseModuleDoubts({
                             {doubt.resolved || doubt.status === 'answered' ? 'resolved' : 'open'}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-300">{doubt.description}</p>
+                         <p className="text-sm text-[var(--muted-ink)]">{doubt.description}</p>
 
                         {doubt.messages.length > 0 && (
                           <div className="mt-3 space-y-2">
                             {doubt.messages.map((message) => (
-                              <div key={message.id} className="bg-gray-700 rounded p-2">
-                                <p className="text-sm text-gray-100">{message.text}</p>
-                                <p className="text-xs text-gray-400 mt-1">
+                               <div key={message.id} className="bg-[var(--canvas)] rounded p-2">
+                                 <p className="text-sm text-[var(--ink)]">{message.text}</p>
+                                 <p className="text-xs text-[var(--muted-ink)] mt-1">
                                   {message.isResponse ? 'Educator response' : 'Student message'}
                                 </p>
                               </div>

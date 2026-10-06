@@ -84,6 +84,13 @@ class ContentService {
         }
     }
 
+    async getStudyMaterialUrl(materialId: string) {
+        const response = await axios.get(`${API_URL}/content/getStudyMaterialUrl/${materialId}`, {
+            headers: { Authorization: `Bearer ${authService.getAccessToken()}` }
+        });
+        return response.data;
+    }
+
     async createClass(
         moduleId: string, 
         formData: FormData,
@@ -148,6 +155,13 @@ class ContentService {
             }
             throw error;
         }
+    }
+
+    async getClassStreamUrl(contentId: string) {
+        const response = await axios.get(`${API_URL}/content/getClassStreamUrl/${contentId}`, {
+            headers: { Authorization: `Bearer ${authService.getAccessToken()}` }
+        });
+        return response.data;
     }
 
     async updateClass(

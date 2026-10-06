@@ -25,6 +25,11 @@ interface SignupData {
   age?: number;
 }
 
+interface SessionTokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -70,6 +75,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const establishSession = async (tokens?: SessionTokens) => {
+    // Invalidate any in-flight initial session check before publishing the new
+    // session. Otherwise a late unauthenticated check can overwrite `user`
+    // after OTP verification and make the dashboard look signed out.
+    const generation = ++sessionGeneration.current;
+    if (tokens) authService.setTokens(tokens);
+
+    try {
+      const profile = await authService.validateSession();
+      if (generation !== sessionGeneration.current) return false;
+      if (!profile.success || !profile.user) {
+        setUser(null);
+        setLoading(false);
+        return false;
+      }
+      setUser(profile.user);
+      setLoading(false);
+      return true;
+    } catch {
+      if (generation === sessionGeneration.current) {
+        setUser(null);
+        setLoading(false);
+      }
+      return false;
+    }
+  };
+
   useEffect(() => {
     const initAuth = async () => {
       const generation = sessionGeneration.current;
@@ -106,7 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     const generation = sessionGeneration.current;
     const response = await authService.login(email, password);
-    if (!response.success || generation !== sessionGeneration.current || !await fetchUserProfile()) {
+    if (!response.success || generation !== sessionGeneration.current || !await establishSession()) {
       throw new Error('Could not confirm your session. Please sign in again.');
     }
   };
@@ -139,13 +171,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!response.accessToken || !response.refreshToken) throw new Error('Missing session tokens');
       if (generation !== sessionGeneration.current) throw new Error('Session changed');
-      authService.setTokens(response);
-      const profile = await authService.validateSession();
-      if (!profile.success || !profile.user) throw new Error('Profile unavailable');
-      if (generation !== sessionGeneration.current) throw new Error('Session changed');
-      setUser(profile.user);
+      if (!await establishSession(response)) throw new Error('Profile unavailable');
     } catch {
-      if (generation === sessionGeneration.current) setUser(null);
+      if (generation === sessionGeneration.current) {
+        setUser(null);
+        setLoading(false);
+      }
       throw new VerificationSessionError();
     }
 
@@ -156,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Optional intent must not invalidate a completed email verification.
     }
-    router.push(pendingEducatorRegistration ? '/educator/register' : '/dashboard');
+    router.replace(pendingEducatorRegistration ? '/educator/register' : '/dashboard');
   };
 
   const logout = async () => {
@@ -221,7 +252,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-
 
 
 

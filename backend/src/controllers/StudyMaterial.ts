@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { UploadedFile } from 'express-fileupload';
 import { db } from '../db/index.ts';
 import {  contentTable, usersTable, modulesTable, coursesTable, educatorsTable } from '../db/schema.ts';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 import { uploadMedia, deleteMedia, getSignedMediaUrl } from '../utils/storage.ts';
 import { getContentAccess, getCourseForContent, getCourseForModule, isCourseOwner, isUuid } from '../utils/access.ts';
 
@@ -294,7 +294,7 @@ export const getModuleStudyMaterials = async (req: AuthenticatedRequest, res: Re
         updatedAt: contentTable.updatedAt
       })
       .from(contentTable)
-      .where(eq(contentTable.moduleId, moduleId))
+      .where(and(eq(contentTable.moduleId, moduleId), ne(contentTable.type, 'video')))
       .orderBy(contentTable.order);
 
     if (!materials || materials.length === 0) {
@@ -306,7 +306,8 @@ export const getModuleStudyMaterials = async (req: AuthenticatedRequest, res: Re
 
     return res.status(200).json({
       success: true,
-      data: await Promise.all(materials.map(async material => ({ ...material, fileUrl: await getSignedMediaUrl(material.fileUrl) })))
+      // Lists are metadata-only. Signing is deferred until the client opens a file.
+      data: materials
     });
 
   } catch (error) {
@@ -316,6 +317,20 @@ export const getModuleStudyMaterials = async (req: AuthenticatedRequest, res: Re
       message: 'Failed to fetch study materials'
     });
   }
+};
+
+/** Issue a short-lived URL only after the caller has access to the owning course. */
+export const getStudyMaterialUrl = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+  try {
+    const { materialId } = req.params;
+    if (!isUuid(materialId)) return res.status(400).json({ success: false, message: 'Invalid material ID' });
+    const [material] = await db.select({ id: contentTable.id, fileUrl: contentTable.fileUrl, moduleId: contentTable.moduleId })
+      .from(contentTable).where(and(eq(contentTable.id, materialId), ne(contentTable.type, 'video'))).limit(1);
+    if (!material) return res.status(404).json({ success: false, message: 'Study material not found' });
+    const courseId = await getCourseForModule(material.moduleId);
+    if (!courseId || !await getContentAccess(req.user.id, courseId)) return res.status(403).json({ success: false, message: 'Access denied' });
+    return res.json({ success: true, data: { id: material.id, fileUrl: await getSignedMediaUrl(material.fileUrl) } });
+  } catch { return res.status(500).json({ success: false, message: 'Failed to sign study material URL' }); }
 };
 
 // export const moderateStudyMaterial = {
@@ -347,9 +362,6 @@ export const getModuleStudyMaterials = async (req: AuthenticatedRequest, res: Re
 //     }
 //   }
 // };
-
-
-
 
 
 

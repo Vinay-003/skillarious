@@ -47,6 +47,40 @@ test('valid verification updates the signed-in profile before entering the dashb
   await expect(page.getByRole('heading', { name: 'Welcome back, Fixture.' })).toBeVisible();
 });
 
+test('OTP sign-in is not overwritten by a late initial session check', async ({ page, context, baseURL }) => {
+  await context.addCookies([
+    { name: 'accessToken', value: 'stale-access', url: baseURL! },
+    { name: 'refreshToken', value: 'stale-refresh', url: baseURL! },
+  ]);
+
+  let releaseInitialValidation!: () => void;
+  const initialValidationStarted = page.waitForRequest(request => request.url().endsWith('/api/v1/auth/validate'));
+  const initialValidationRelease = new Promise<void>(resolve => { releaseInitialValidation = resolve; });
+  let validations = 0;
+  await page.route('**/api/v1/auth/validate', async route => {
+    validations++;
+    if (validations === 1) {
+      await initialValidationRelease;
+      await route.fulfill({ status: 503, json: { success: false, message: 'Temporary outage' } });
+      return;
+    }
+    await route.fulfill({ json: { success: true, user: student } });
+  });
+  await page.route('**/api/v1/otp/verify', route => route.fulfill({ json: { success: true, message: 'Verified', accessToken: 'fixture-access', refreshToken: 'fixture-refresh' } }));
+
+  await page.goto('/verify-email?email=student%40example.test');
+  await initialValidationStarted;
+  for (let digit = 1; digit <= 6; digit++) await page.getByLabel(`OTP digit ${digit}`, { exact: true }).fill(String(digit));
+  await page.getByRole('button', { name: 'Verify Email', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  // Let the older request finish after the new session is already active.
+  releaseInitialValidation();
+  await expect(page.getByRole('heading', { name: 'Welcome back, Fixture.' })).toBeVisible();
+  await expect(page.getByText('Sign in to see your learning.')).not.toBeVisible();
+  expect(validations).toBe(2);
+});
+
 test('optional registration storage failure cannot invalidate a successful OTP', async ({ page, context }) => {
   await page.addInitScript(() => {
     const getItem = Storage.prototype.getItem;

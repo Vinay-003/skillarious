@@ -21,3 +21,10 @@ it('can disable diagnostics while retaining a generated request id', () => {
   requestDiagnostics({ method: 'GET' } as any, res, vi.fn()); res.emit('finish');
   expect(log).not.toHaveBeenCalled(); expect(res.setHeader).toHaveBeenCalledWith('X-Request-Id', expect.any(String));
 });
+it('does not log platform health probes', () => {
+  vi.stubEnv('NODE_ENV', 'development'); vi.stubEnv('LOG_REQUESTS', '1');
+  const log = vi.spyOn(console, 'info').mockImplementation(() => {});
+  const res: any = new EventEmitter(); res.setHeader = vi.fn();
+  requestDiagnostics({ method: 'GET', path: '/health' } as any, res, vi.fn()); res.emit('finish');
+  expect(log).not.toHaveBeenCalled();
+});

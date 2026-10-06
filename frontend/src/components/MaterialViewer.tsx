@@ -68,7 +68,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose, cont
                     <a
                         href={resolvedUrl}
                         download
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        className="px-4 py-2 bg-[var(--forest)] text-[var(--action-text)] rounded-lg hover:opacity-90"
                     >
                         Download File
                     </a>
@@ -87,7 +87,7 @@ export default function MaterialViewer({ fileUrl, fileType, title, onClose, cont
                         aria-label="Close material viewer"
                         className="p-2 rounded-full transition-colors"
                     >
-                        <X className="w-6 h-6 text-gray-400" />
+                        <X className="w-6 h-6 text-[var(--muted-ink)]" />
                     </button>
                 </div>
                 
