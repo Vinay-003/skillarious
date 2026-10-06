@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../db/index.ts';
 import { reviewsTable, coursesTable, transactionsTable } from '../db/schema.ts';
 import { eq, avg, desc, and, sql } from 'drizzle-orm';
+import { isUuid } from '../utils/access.ts';
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -11,51 +12,9 @@ interface AuthenticatedRequest extends Request {
 
 // Add this helper function
 const verifyPurchase = async (userId: string, courseId: string) => {
-    try {
-        // First get the transaction and log its exact status
-        const transactions = await db
-            .select({
-                id: transactionsTable.id,
-                userId: transactionsTable.userId,
-                courseId: transactionsTable.courseId,
-                status: transactionsTable.status
-            })
-            .from(transactionsTable)
-            .where(
-                and(
-                    eq(transactionsTable.userId, userId),
-                    eq(transactionsTable.courseId, courseId)
-                )
-            );
-
-       
-        if (transactions.length > 0) {
-            console.log('Status exact value:', {
-                status: transactions[0].status,
-                statusLength: transactions[0].status.length,
-                statusCharCodes: [...transactions[0].status].map(char => char.charCodeAt(0))
-            });
-        }
-
-        // Try with LIKE operator
-        const completedTransactions = await db
-            .select()
-            .from(transactionsTable)
-            .where(
-                and(
-                    eq(transactionsTable.userId, userId),
-                    eq(transactionsTable.courseId, courseId),
-                    sql`${transactionsTable.status} LIKE 'completed%'` // Match 'completed' followed by anything
-                )
-            );
-
-        
-
-        return completedTransactions.length > 0;
-    } catch (error) {
-        console.error('Error verifying purchase:', error);
-        return false;
-    }
+    const [purchase] = await db.select({ id: transactionsTable.id }).from(transactionsTable)
+      .where(and(eq(transactionsTable.userId, userId), eq(transactionsTable.courseId, courseId), eq(transactionsTable.status, 'completed'))).limit(1);
+    return Boolean(purchase);
 };
 
 // Create a new review
@@ -198,6 +157,7 @@ export const updateReview = async (req: AuthenticatedRequest, res: Response) => 
 export const getAverageRating = async (req: Request, res: Response) => {
     try {
         const { courseId } = req.params;
+        if (!isUuid(courseId)) return res.status(400).json({ success: false, message: 'Invalid course ID' });
 
         const result = await db
             .select({
@@ -216,8 +176,8 @@ export const getAverageRating = async (req: Request, res: Response) => {
             success: true,
             averageRating: Number.isFinite(averageRating) ? averageRating : 0
         });
-    } catch (error) {
-        console.error('Error fetching average rating:', error);
+    } catch {
+        console.error('Error fetching average rating');
         return res.status(500).json({
             success: false,
             message: 'Error fetching average rating'
@@ -229,6 +189,7 @@ export const getAverageRating = async (req: Request, res: Response) => {
 export const getCourseReviews = async (req: Request, res: Response) => {
     try {
         const { courseId } = req.params;
+        if (!isUuid(courseId)) return res.status(400).json({ success: false, message: 'Invalid course ID' });
 
         const reviews = await db
             .select()
@@ -240,8 +201,8 @@ export const getCourseReviews = async (req: Request, res: Response) => {
             success: true,
             reviews
         });
-    } catch (error) {
-        console.error('Error fetching reviews:', error);
+    } catch {
+        console.error('Error fetching reviews');
         return res.status(500).json({
             success: false,
             message: 'Error fetching reviews'
@@ -301,7 +262,6 @@ export const deleteReview = async (req: AuthenticatedRequest, res: Response) => 
         });
     }
 };
-
 
 
 

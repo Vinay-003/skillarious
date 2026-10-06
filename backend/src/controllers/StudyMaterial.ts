@@ -3,7 +3,8 @@ import { UploadedFile } from 'express-fileupload';
 import { db } from '../db/index.ts';
 import {  contentTable, usersTable, modulesTable, coursesTable, educatorsTable } from '../db/schema.ts';
 import { eq, and, or } from 'drizzle-orm';
-import { uploadMedia, deleteMedia } from '../utils/storage.ts';
+import { uploadMedia, deleteMedia, getSignedMediaUrl } from '../utils/storage.ts';
+import { getContentAccess, getCourseForContent, getCourseForModule, isCourseOwner, isUuid } from '../utils/access.ts';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -50,6 +51,8 @@ export const uploadStudyMaterial = async (req: AuthenticatedRequest, res: Respon
       });
     }
 
+    const courseId = await getCourseForModule(moduleId);
+    if (!courseId || !await isCourseOwner(req.user.id, courseId)) return res.status(403).json({ success: false, message: "Course ownership required" });
     const upload = await uploadMedia(file);
 
     const material = await db.insert(contentTable).values({
@@ -66,7 +69,7 @@ export const uploadStudyMaterial = async (req: AuthenticatedRequest, res: Respon
       order: parseInt(order) || 0,
       isPreview: Boolean(req.body.isPreview)
       // Let the defaultNow() handle timestamps
-    });
+    }).returning();
 
     return res.status(201).json({
       success: true,
@@ -133,8 +136,6 @@ export const updateStudyMaterial = async (req: AuthenticatedRequest, res: Respon
       )
       .where(eq(contentTable.id, materialId));
      
-    console.log('Debug - Found material:', existingMaterial); // Debug log
-    console.log('Debug - User ID:', req.user.id); // Debug log
 
     if (!existingMaterial.length) {
       return res.status(404).json({
@@ -157,7 +158,7 @@ export const updateStudyMaterial = async (req: AuthenticatedRequest, res: Respon
         .from(modulesTable)
         .where(eq(modulesTable.id, moduleId));
 
-      if (!moduleExists.length) {
+      if (!moduleExists.length || moduleExists[0].courseId !== existingMaterial[0].material.courseId) {
         return res.status(400).json({
           success: false,
           message: 'Invalid module ID provided'
@@ -192,10 +193,7 @@ export const updateStudyMaterial = async (req: AuthenticatedRequest, res: Respon
         updateData.fileUrl = upload.url;
         updateData.type = fileToUpload.mimetype;
 
-        // Delete old file if exists
-        if (existingMaterial[0].material.fileUrl) {
-          await deleteMedia(existingMaterial[0].material.fileUrl);
-        }
+
       } catch (uploadError) {
         return res.status(500).json({
           success: false,
@@ -210,6 +208,7 @@ export const updateStudyMaterial = async (req: AuthenticatedRequest, res: Respon
       .where(eq(contentTable.id, materialId))
       .returning();
 
+    if (file && existingMaterial[0].material.fileUrl) await deleteMedia(existingMaterial[0].material.fileUrl).catch(error => console.error("Old storage object cleanup failed:", error));
     return res.status(200).json({
       success: true,
       data: updatedMaterial[0],
@@ -242,14 +241,12 @@ export const deleteStudyMaterial = async (req: AuthenticatedRequest, res: Respon
       });
     }
 
-    // Delete from Cloudinary using the URL
-    if (material[0].fileUrl) {
-      await deleteMedia(material[0].fileUrl);
-    }
-
+    const courseId = await getCourseForContent(materialId);
+    if (!courseId || !await isCourseOwner(req.user.id, courseId)) return res.status(403).json({ success: false, message: "Course ownership required" });
     // Delete from database
     await db.delete(contentTable)
       .where(eq(contentTable.id, materialId));
+    await deleteMedia(material[0].fileUrl).catch(error => console.error("Storage cleanup failed:", error));
 
     return res.status(200).json({
       success: true,
@@ -266,7 +263,7 @@ export const deleteStudyMaterial = async (req: AuthenticatedRequest, res: Respon
 
 // Controller for getting study materials for a module
 
-export const getModuleStudyMaterials = async (req: Request, res: Response): Promise<Response> => {
+export const getModuleStudyMaterials = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
   try {
     const { moduleId } = req.params;
     
@@ -277,6 +274,10 @@ export const getModuleStudyMaterials = async (req: Request, res: Response): Prom
       });
     }
 
+    if (!isUuid(moduleId)) return res.status(400).json({ success: false, message: "Invalid module ID" });
+    const courseId = await getCourseForModule(moduleId);
+    if (!courseId) return res.status(404).json({ success: false, message: "Module not found" });
+    if (!await getContentAccess(req.user.id, courseId)) return res.status(403).json({ success: false, message: "Access denied" });
     const materials = await db
       .select({
         id: contentTable.id,
@@ -305,7 +306,7 @@ export const getModuleStudyMaterials = async (req: Request, res: Response): Prom
 
     return res.status(200).json({
       success: true,
-      data: materials
+      data: await Promise.all(materials.map(async material => ({ ...material, fileUrl: await getSignedMediaUrl(material.fileUrl) })))
     });
 
   } catch (error) {
@@ -346,7 +347,6 @@ export const getModuleStudyMaterials = async (req: Request, res: Response): Prom
 //     }
 //   }
 // };
-
 
 
 

@@ -2,7 +2,8 @@ import { Request, Response, RequestHandler } from 'express';
 import { db } from '../db/index.ts';
 import { coursesTable, educatorsTable, modulesTable, contentTable } from '../db/schema.ts';
 import { eq, and } from 'drizzle-orm';
-import { uploadMedia, deleteMedia } from '../utils/storage.ts';
+import { uploadMedia, deleteMedia, getSignedMediaUrl } from '../utils/storage.ts';
+import { getContentAccess, getCourseForContent, getCourseForModule, isUuid } from '../utils/access.ts';
 import { UploadedFile } from 'express-fileupload';
 
 interface AuthenticatedRequest extends Request {
@@ -42,7 +43,9 @@ export const createClass = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Upload to Cloudinary
+    const courseId = await getCourseForModule(moduleId);
+    if (!courseId || !await isEducatorForCourse(userId, courseId)) return res.status(403).json({ success: false, message: "Course ownership required" });
+    // Upload to Supabase
     const videoUpload = await uploadMedia(videoFile);
 
     // Create the class record
@@ -72,9 +75,13 @@ export const createClass = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-export const getClassStream = async (req: Request, res: Response) => {
+export const getClassStream = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { contentId } = req.params;
+    if (!isUuid(contentId)) return res.status(400).json({ success: false, message: "Invalid content ID" });
+    const courseId = await getCourseForContent(contentId);
+    if (!courseId) return res.status(404).json({ success: false, message: "Class not found" });
+    if (!await getContentAccess(req.user.id, courseId)) return res.status(403).json({ success: false, message: "Access denied" });
     const content = await db.select()
       .from(contentTable)
       .where(and(
@@ -97,7 +104,7 @@ export const getClassStream = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      data: content[0]
+      data: { ...content[0], fileUrl: await getSignedMediaUrl(content[0].fileUrl) }
     });
   } catch (error) {
     return res.status(500).json({
@@ -145,7 +152,11 @@ export const updateClass = async (req: AuthenticatedRequest, res: Response) => {
 
     const updateData: Record<string, any> = {};
 
-    if (moduleId) updateData.moduleId = moduleId;
+    if (moduleId) {
+      const targetCourseId = await getCourseForModule(moduleId);
+      if (targetCourseId !== courseId) return res.status(403).json({ success: false, message: "Cannot move class to another course" });
+      updateData.moduleId = moduleId;
+    }
     if (title) updateData.title = title;
     if (description) updateData.description = description;
     if (duration) updateData.duration = parseFloat(duration);
@@ -154,10 +165,7 @@ export const updateClass = async (req: AuthenticatedRequest, res: Response) => {
       const videoFile = req.files.video as UploadedFile;
       const videoUpload = await uploadMedia(videoFile);
       
-      // Delete old video if exists
-      if (contentDetails[0].content.fileUrl) {
-        await deleteMedia(contentDetails[0].content.fileUrl);
-      }
+
 
       updateData.fileUrl = videoUpload.url;
     }
@@ -167,6 +175,7 @@ export const updateClass = async (req: AuthenticatedRequest, res: Response) => {
       .where(eq(contentTable.id, contentId))
       .returning();
 
+    if (req.files?.video) await deleteMedia(contentDetails[0].content.fileUrl).catch(error => console.error("Storage cleanup failed:", error));
     return res.status(200).json({
       success: true,
       message: 'Class updated successfully',
@@ -227,18 +236,10 @@ export const deleteClass = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Delete from Cloudinary first
-    if (content[0].fileUrl) {
-      try {
-        await deleteMedia(content[0].fileUrl);
-      } catch (cloudinaryError) {
-        console.error('Cloudinary deletion error:', cloudinaryError);
-      }
-    }
-
     // Delete from database
     await db.delete(contentTable)
       .where(eq(contentTable.id, contentId));
+    await deleteMedia(content[0].fileUrl).catch(error => console.error("Storage cleanup failed:", error));
 
     return res.status(200).json({
       success: true,
@@ -254,10 +255,14 @@ export const deleteClass = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-export const getModuleClasses = async (req: Request, res: Response) => {
+export const getModuleClasses = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { moduleId } = req.params;
 
+    if (!isUuid(moduleId)) return res.status(400).json({ success: false, message: "Invalid module ID" });
+    const courseId = await getCourseForModule(moduleId);
+    if (!courseId) return res.status(404).json({ success: false, message: "Module not found" });
+    if (!await getContentAccess(req.user.id, courseId)) return res.status(403).json({ success: false, message: "Access denied" });
     const classes = await db
       .select({
         id: contentTable.id,
@@ -279,7 +284,7 @@ export const getModuleClasses = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      data: classes
+      data: await Promise.all(classes.map(async item => ({ ...item, fileUrl: await getSignedMediaUrl(item.fileUrl) })))
     });
   } catch (error) {
     console.error('Error fetching module classes:', error);

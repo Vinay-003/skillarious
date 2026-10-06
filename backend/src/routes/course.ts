@@ -34,6 +34,6 @@ router.get('/educator/:id', getCoursesByEducator as unknown as express.RequestHa
 router.get("/ownership/:courseId",  authenticateUser as unknown as express.RequestHandler, checkCourseOwnership as unknown as express.RequestHandler);
 router.get("/access/:courseId",  authenticateUser as unknown as express.RequestHandler, checkCourseAccess as unknown as express.RequestHandler);
 router.post("/purchase/:courseId",  authenticateUser as unknown as express.RequestHandler, purchaseCourse as unknown as express.RequestHandler);
-router.get('/purchased', authenticateUser, getPurchasedCourses);
+router.get('/purchased', authenticateUser as express.RequestHandler, getPurchasedCourses as unknown as express.RequestHandler);
 
 export default router;

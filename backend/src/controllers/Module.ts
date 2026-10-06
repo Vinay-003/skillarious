@@ -244,13 +244,13 @@ export const deleteModule = async (req: AuthenticatedRequest, res: Response): Pr
       return;
     }
 
-    // Delete module
-    await db.delete(modulesTable)
+    // Keep dependent content and enrolled learners' access intact.
+    await db.update(modulesTable).set({ isDismissed: true, dismissedAt: new Date(), dismissReason: 'Removed by educator' })
       .where(eq(modulesTable.id, moduleId));
 
     res.status(200).json({
       success: true,
-      message: 'Module deleted successfully'
+      message: 'Module removed without deleting its content'
     });
   } catch (error) {
     console.error('Error deleting module:', error);
@@ -298,5 +298,4 @@ export const getAllModules = async (req: Request, res: Response): Promise<void> 
     });
   }
 };
-
 

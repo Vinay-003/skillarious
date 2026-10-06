@@ -1,16 +1,11 @@
-import jwt from "jsonwebtoken"
+import jwt from 'jsonwebtoken';
+import { randomUUID } from 'node:crypto';
 
-const ACCESS_SECRET = process.env.JWT_SECRET || "access secret"
-const REFRESH_SECRET = process.env.REFRESH_SECRET || "refresh secret"
-
- export const generateAccessToken = (userId: string , email: string) => {
-    const payload = {id: userId ,email};
-    return jwt.sign(payload, ACCESS_SECRET,{expiresIn: "50d"});
-} ;
-
-export const generateRefreshToken = (userId:string) => {
-    const payload = {id: userId};
-    return jwt.sign(payload, REFRESH_SECRET, {expiresIn: "1000d"});
-};
-
-  
+export function generateAccessToken(userId: string, email: string) {
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured');
+  return jwt.sign({ id: userId, email }, process.env.JWT_SECRET, { expiresIn: '15m', jwtid: randomUUID() });
+}
+export function generateRefreshToken(userId: string) {
+  if (!process.env.REFRESH_SECRET) throw new Error('REFRESH_SECRET is not configured');
+  return jwt.sign({ id: userId }, process.env.REFRESH_SECRET, { expiresIn: '7d', jwtid: randomUUID() });
+}

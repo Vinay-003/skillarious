@@ -1,110 +1,38 @@
-import crypto from "crypto";
-import {NextFunction, Request,Response} from "express";
-import {db} from "../db/index.ts";
-import {otpsTable as otps, usersTable} from "../db/schema.ts";
-import {sendEmail} from "../utils/sendEmail.ts";
-import {eq} from "drizzle-orm";
-import {desc} from "drizzle-orm";
-import { generateAccessToken, generateRefreshToken } from "../utils/generateToken.ts";
+import type { Request, Response } from 'express';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index.ts';
+import { usersTable } from '../db/schema.ts';
+import { issueOtp, consumeOtp } from '../utils/otp.ts';
+import { generateAccessToken, generateRefreshToken } from '../utils/generateToken.ts';
+import { normalizeEmail, validEmail } from './Auth.ts';
+import { emailFailure } from '../utils/emailErrors.ts';
 
-// we will generate otp through RLC6238TOTP
-// --------------------------------------------------------------------------------
-// generating the otp
-export const generateOtp = async(req: Request, res: Response): Promise<void>  => {
-    try{
-        const{email} =req.body;
-        console.log(' email --> ', email);
-        if(!email){
-             res.status(400).json({
-                succcess:false,
-                message: "Email is required"
-            });
-            return;
-        }
-        const otp = crypto.randomInt(100000,999999);
-        const expiry = new Date(Date.now() + 2*60*1000);
-
-        //store in db
-        await db.insert(otps).values({
-            id: crypto.randomUUID(),
-            value: BigInt(otp),
-            email,
-            expiry,
-            lastSent: new Date(), // Add the missing lastSent field
-        });
-
-        //send otp via mail
-        await sendEmail(email, "Your OTP Code", `Your OTP is ${otp}. It is valid for 2 minutes.`)
-        res.status(200).json({ success: true, message: "OTP sent successfully",otp });
-        return;
-    }catch (error) {
-        console.log(error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
-        return;
-    };
-    return;
+export async function generateOtp(req: Request, res: Response) {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!validEmail(email)) return res.status(400).json({ success: false, message: 'Valid email is required' });
+    const [user] = await db.select({ id: usersTable.id, verified: usersTable.verified, isBanned: usersTable.isBanned }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (user && !user.verified && !user.isBanned) await issueOtp(email);
+    return res.json({ success: true, message: 'If eligible, a verification email was accepted for sending.' });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'OTP_RATE_LIMIT') return res.status(429).json({ success: false, message: 'Try again in one minute' });
+    return res.status(503).json({ success: false, ...emailFailure(error) });
+  }
 }
 
-// otp verification
-export const verifyOtp = async (req: Request, res: Response): Promise<any> => {
-    try {
-        const { email, otp } =  req.body;
-        if (!email || !otp) {
-            res.status(400).json({success: false, message: "Email and OTP are required"})
-            return;
-        }
-        
-        // Fetch OTP from DB
-        const otpRecord = await db.select().from(otps).where(eq(otps.email, email)).orderBy(desc(otps.expiry)).limit(1);
-        
-        if (!otpRecord.length) {
-            res.status(404).json({success: false, message: "OTP not found"})
-            return ;
-        }
-
-        const { value, expiry } = otpRecord[0];
-
-        if (BigInt(value) !== BigInt(otp.trim()) || new Date() > expiry) {
-            res.status(400).json({ success: false, message: "Invalide or expried otp" });
-            return ;
-        }
-
-        await db.update(usersTable).set({verified : true}).where(eq(usersTable.email, email));
-
-        await db.delete(otps).where(eq(otps.email, email));
-        
-        const [user] = await db.select()
-            .from(usersTable)
-            .where(eq(usersTable.email, email))
-            .limit(1);
-
-        if (!user) {
-            res.status(404).json({
-                success: false,
-                message: "User not found"
-            });
-            return;
-        }
-
-        const accessToken = generateAccessToken(user.id, user.email);
-        const refreshToken = generateRefreshToken(user.id);
-    
-        await db.update(usersTable).set({ refreshToken }).where(eq(usersTable.id, user.id));
-    
-        res.status(200).json({
-            success: true,
-            message: "OTP verified successfully",
-            accessToken,
-            refreshToken,  
-        });return;
-
-
-    } catch (error) {
-        console.log('nitin\'s error -> ', error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
-    }
-    return;
-};
-
-
-
+export async function verifyOtp(req: Request, res: Response) {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    if (!validEmail(email)) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (!user || user.isBanned) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+    if (user.verified) return res.status(400).json({ success: false, code: 'EMAIL_ALREADY_VERIFIED', message: 'Email already verified. Please sign in.' });
+    const accessToken = generateAccessToken(user.id, user.email);
+    const refreshToken = generateRefreshToken(user.id);
+    if (!await consumeOtp(email, req.body?.otp, async (tx) => {
+      const changed = await tx.update(usersTable).set({ verified: true, refreshToken }).where(eq(usersTable.id, user.id)).returning({ id: usersTable.id });
+      if (!changed.length) throw new Error('User update failed');
+    })) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+    return res.json({ success: true, message: 'OTP verified successfully', accessToken, refreshToken });
+  } catch { return res.status(500).json({ success: false, message: 'Unable to verify code' }); }
+}

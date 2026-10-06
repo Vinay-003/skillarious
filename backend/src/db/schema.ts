@@ -1,4 +1,4 @@
-import { pgTable, uuid, bigint, text, timestamp, unique, boolean, foreignKey, numeric, real, integer, decimal, json, primaryKey, PgTable } from "drizzle-orm/pg-core"
+import { pgTable, uuid, bigint, text, timestamp, unique, boolean, foreignKey, numeric, real, integer, decimal, json, primaryKey, PgTable, index, check } from "drizzle-orm/pg-core"
 import { sql } from 'drizzle-orm';
 
 // USERS TABLE
@@ -164,11 +164,20 @@ export const doubtsTable = pgTable('doubts', {
   educatorAssigned: uuid('educator_assigned').references(() => educatorsTable.id),
   resolved: boolean('resolved').notNull().default(false),
   userId: uuid('user_id').notNull().references(() => usersTable.id),
-  contentId: text('content_id').notNull(),
+  contentId: uuid('content_id').notNull().references(() => contentTable.id),
   title: text('title').notNull(),
   description: text('description').notNull(),
-  status: text('status').notNull(),
-});
+  status: text('status').notNull().default('open'),
+}, t => ({
+  contentIdx: index('doubts_content_id_idx').on(t.contentId),
+  userIdx: index('doubts_user_id_idx').on(t.userId),
+  classMatchesContent: check('doubts_class_matches_content', sql`${t.classId} IS NULL OR ${t.classId} = ${t.contentId}`),
+  statusValid: check('doubts_status_valid', sql`${t.status} IN ('open', 'answered', 'resolved')`),
+  resolvedMatchesStatus: check('doubts_resolved_matches_status', sql`${t.resolved} = (${t.status} = 'resolved')`),
+  messageLength: check('doubts_message_length', sql`length(btrim(${t.message})) BETWEEN 1 AND 10000`),
+  titleLength: check('doubts_title_length', sql`length(btrim(${t.title})) BETWEEN 1 AND 200 AND length(${t.title}) <= 200`),
+  descriptionLength: check('doubts_description_length', sql`length(btrim(${t.description})) BETWEEN 1 AND 10000 AND length(${t.description}) <= 10000`),
+}));
 
 // MESSAGES TABLE
 export const messagesTable = pgTable('messages', {
@@ -176,7 +185,7 @@ export const messagesTable = pgTable('messages', {
   doubtId: uuid('doubt_id').notNull().references(() => doubtsTable.id),
   text: text('text').notNull(),
   isResponse: boolean('is_response').notNull().default(false),
-});
+}, t => ({ doubtIdx: index('messages_doubt_id_idx').on(t.doubtId) }));
 
 // CONTENT TABLE - Single table for all module content
 export const contentTable = pgTable('content', {
@@ -186,6 +195,9 @@ export const contentTable = pgTable('content', {
   description: text('description'),
   type: text('type').notNull(),
   fileUrl: text('file_url').notNull(),
+  isDismissed: boolean('is_dismissed').default(false).notNull(),
+  dismissReason: text('dismiss_reason'),
+  dismissedAt: timestamp('dismissed_at'),
   duration: numeric('duration'),
   views: integer('views').default(0),
   order: integer('order').default(0),

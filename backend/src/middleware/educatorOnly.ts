@@ -1,7 +1,8 @@
 import { Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../types';
-import { db } from '../db';
-import { usersTable } from '../db/schema';
+import type { Request } from 'express';
+type AuthenticatedRequest = Request & { user: { id: string } };
+import { db } from '../db/index.ts';
+import { usersTable } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 
 export const educatorOnly = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

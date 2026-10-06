@@ -2,6 +2,7 @@ import {Request,Response} from 'express';
 import {db} from '../db/index.ts';
 import{coursesTable, educatorsTable, categoryTable, transactionsTable, usersTable, categoryCoursesTable} from '../db/schema.ts';
 import { eq,or,sql, and } from 'drizzle-orm';
+import { getContentAccess, isUuid } from '../utils/access.ts';
 
 interface AuthenticatedRequest extends Request {
     user: {
@@ -204,12 +205,12 @@ export const updateCourse = async (req: AuthenticatedRequest, res: Response): Pr
       });
     }
 
-    // Delete course
-    await db.delete(coursesTable).where(eq(coursesTable.id, CourseId));
+    // Preserve purchases, learner history and content; removal means delisting.
+    await db.update(coursesTable).set({ isDismissed: true, dismissedAt: new Date(), dismissReason: 'Removed by educator' }).where(eq(coursesTable.id, CourseId));
 
     return res.status(200).json({ 
       success: true,
-      message: 'Course deleted successfully' });
+      message: 'Course removed from catalogue; enrolled learners retain access' });
   } catch (error) {
     console.error('Error deleting course:', error);
     return res.status(500).json({
@@ -245,7 +246,7 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
         .innerJoin(
           usersTable, 
           eq(educatorsTable.userId, usersTable.id)
-        );
+        ).where(eq(coursesTable.isDismissed, false));
   
       return res.status(200).json({
         success: true,
@@ -253,7 +254,7 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
         courses,
       });
     } catch (error) {
-      console.error('Error fetching courses:', error);
+      console.error('Error fetching courses');
       return res.status(500).json({
         success: false,
         message: 'Error fetching courses'
@@ -265,6 +266,7 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
   export const getSingleCourse = async (req: Request, res: Response): Promise<Response> => {
     try {
       const { id } = req.params;
+      if (!isUuid(id)) return res.status(400).json({ message: 'Invalid course ID' });
   
       // Fetch course details
       const course = await db
@@ -294,20 +296,31 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
       });
   
     } catch (error) {
-      console.error('Error fetching course:', error);
+      console.error('Error fetching course');
       return res.status(500).json({ message: 'Error fetching course' });
     }
   };
 
   // 5) controller for search course
 
+  const validSearchFilter = (value: unknown): value is string =>
+    typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 200;
+
   export const searchCourses = async (req: Request, res: Response): Promise<Response> => {
     try {
       const { name,description,about } = req.query;
-  
-      if (!name &&!description && !about) {
-        return res.status(400).json({ message: 'Search query is required' });
+      const filters = [
+        [name, coursesTable.name],
+        [description, coursesTable.description],
+        [about, coursesTable.about],
+      ] as const;
+      if (filters.every(([value]) => value === undefined) ||
+          filters.some(([value]) => value !== undefined && !validSearchFilter(value))) {
+        return res.status(400).json({ message: 'Valid search query is required' });
       }
+      const conditions = filters
+        .filter((entry): entry is readonly [string, typeof coursesTable.name] => validSearchFilter(entry[0]))
+        .map(([value, column]) => sql`${column} ILIKE ${value.trim() + '%'}`);
   
       // Using SQL raw query for searching (ILIKE for case-insensitive search)
       const courses = await db
@@ -321,13 +334,7 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
            })
         .from(coursesTable)
         .leftJoin(educatorsTable, eq(coursesTable.educatorId, educatorsTable.id))
-        .where(
-          or(
-            sql`${coursesTable.name} ILIKE ${ name + '%'}`,
-            sql`${coursesTable.description} ILIKE ${description + '%'}`,
-            sql`${coursesTable.about} ILIKE ${ about + '%'}`
-          )
-        );
+        .where(and(or(...conditions), eq(coursesTable.isDismissed, false)));
       
       return res.status(200).json({
         message: 'Courses searched successfully',
@@ -335,7 +342,7 @@ export const getAllCourses = async (req: Request, res: Response): Promise<Respon
       });
   
     } catch (error) {
-      console.error('Error searching courses:', error);
+      console.error('Error searching courses');
       return res.status(500).json({ message: 'Error searching courses' });
     }
   };
@@ -424,6 +431,7 @@ export const addCategory = async (req: AuthenticatedRequest, res: Response): Pro
  export const getCoursesByCategory = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { query} = req.query;
+    if (!validSearchFilter(query)) return res.status(400).json({ message: 'Valid category query is required' });
     const courses = await db
       .select({
         id: coursesTable.id,
@@ -443,7 +451,7 @@ export const addCategory = async (req: AuthenticatedRequest, res: Response): Pro
         categoryTable,
         eq(categoryTable.id, categoryCoursesTable.categoryId)
       )
-      .where(sql`${categoryTable.name} ILIKE ${query + '%'}`);
+      .where(and(sql`${categoryTable.name} ILIKE ${query.trim() + '%'}`, eq(coursesTable.isDismissed, false)));
 
     return res.status(200).json({
       message: 'Courses fetched successfully',
@@ -451,7 +459,7 @@ export const addCategory = async (req: AuthenticatedRequest, res: Response): Pro
     });
 
   } catch (error) {
-    console.error('Error fetching courses by category:', error);
+    console.error('Error fetching courses by category');
     return res.status(500).json({ message: 'Error fetching courses' });
   }};
 // 7)  controller for specific educator
@@ -460,14 +468,14 @@ export const getCoursesByEducator = async (req: Request, res: Response): Promise
   try {
     const {id} =req.params as {id: string} ;
     
-    if (!id) {
-      return res.status(400).json({ message: 'Educator ID is required' });
+    if (!isUuid(id)) {
+      return res.status(400).json({ message: 'Invalid educator ID' });
     }
 
     const courses = await db
       .select()
       .from(coursesTable)
-      .where(eq(coursesTable.educatorId, id));
+      .where(and(eq(coursesTable.educatorId, id), eq(coursesTable.isDismissed, false)));
 
     return res.status(200).json({
       message: 'Courses fetched successfully',
@@ -475,7 +483,7 @@ export const getCoursesByEducator = async (req: Request, res: Response): Promise
     });
 
   } catch (error) {
-    console.error('Error in fetching courses by educator:', error);
+    console.error('Error in fetching courses by educator');
     return res.status(500).json({ message: 'Error fetching courses' });
   }
 };
@@ -526,30 +534,11 @@ export const checkCourseOwnership = async (req: AuthenticatedRequest, res: Respo
 
 export const checkCourseAccess = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
   try {
-    const { id: userId } = req.user;
     const { courseId } = req.params;
-
-    // Check if user has purchased the course
-    const transaction = await db
-      .select()
-      .from(transactionsTable)
-      .where(and(
-        eq(transactionsTable.userId, userId),
-        eq(transactionsTable.courseId, courseId),
-        eq(transactionsTable.status, 'completed')
-      ))
-      .limit(1);
-
-    return res.status(200).json({
-      success: transaction.length > 0,
-      hasAccess: transaction.length > 0
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: 'Error checking course access'
-    });
-  }
+    if (!isUuid(courseId)) return res.status(400).json({ success: false, message: 'Invalid course ID' });
+    const access = await getContentAccess(req.user.id, courseId);
+    return res.status(200).json({ success: Boolean(access), hasAccess: Boolean(access) });
+  } catch (error) { return res.status(500).json({ success: false, message: 'Error checking course access' }); }
 };
 
 export const purchaseCourse = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
@@ -557,13 +546,14 @@ export const purchaseCourse = async (req: AuthenticatedRequest, res: Response): 
     const { id: userId } = req.user;
     const { courseId } = req.params;
 
+    if (!isUuid(courseId)) return res.status(400).json({ success: false, message: 'Invalid course ID' });
     const [course] = await db
       .select({
         id: coursesTable.id,
         price: coursesTable.price
       })
       .from(coursesTable)
-      .where(eq(coursesTable.id, courseId))
+      .where(and(eq(coursesTable.id, courseId), eq(coursesTable.isDismissed, false)))
       .limit(1);
 
     if (!course) {
@@ -617,7 +607,7 @@ export const getPurchasedCourses = async (req: AuthenticatedRequest, res: Respon
     const purchases = await db
       .select({
         courseId: transactionsTable.courseId,
-        purchaseDate: transactionsTable.createdAt
+        purchaseDate: transactionsTable.date
       })
       .from(transactionsTable)
       .where(and(

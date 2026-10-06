@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { db } from '../db';
+import { db } from '../db/index.ts';
 import { 
   usersTable,
   adminLogsTable,
@@ -11,13 +11,59 @@ import {
   doubtsTable,
   educatorsTable,
   reviewsTable,
-  transactionsTable
-} from '../db/schema';
-import { and, avg, desc, eq, sql, SQL,count } from 'drizzle-orm';
-import { AdminActionInput } from '../schemas/admin';
+  transactionsTable,
+  adminInvitesTable
+} from '../db/schema.ts';
+import { and, avg, desc, eq, gt, sql, SQL,count } from 'drizzle-orm';
+import { AdminActionInput } from '../schemas/admin.ts';
 import crypto from 'crypto';
-import { sendEmail } from '../utils/email';
+import { sendEmail } from '../utils/sendEmail.ts';
 import bcrypt from 'bcrypt';
+import { adminReportsTable } from '../db/adminReportsSchema.ts';
+import { isUuid } from '../utils/access.ts';
+
+export const getAdminUsers = async (_req: Request, res: Response) => {
+  try {
+    const data = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, isAdmin: usersTable.isAdmin, isBanned: usersTable.isBanned, banReason: usersTable.banReason, verified: usersTable.verified }).from(usersTable).orderBy(desc(usersTable.id));
+    return res.json({ success: true, data });
+  } catch { return res.status(500).json({ success: false, message: 'Error listing users' }); }
+};
+
+export const getAdminCourses = async (_req: Request, res: Response) => {
+  try {
+    const data = await db.select().from(coursesTable).orderBy(desc(coursesTable.start));
+    return res.json({ success: true, data });
+  } catch { return res.status(500).json({ success: false, message: 'Error listing courses' }); }
+};
+
+export const getAdminLogs = async (_req: Request, res: Response) => {
+  try {
+    const data = await db.select().from(adminLogsTable).orderBy(desc(adminLogsTable.createdAt)).limit(200);
+    return res.json({ success: true, data });
+  } catch { return res.status(500).json({ success: false, message: 'Error listing logs' }); }
+};
+
+export const getAdminReports = async (_req: Request, res: Response) => {
+  try {
+    const data = await db.select().from(adminReportsTable).orderBy(desc(adminReportsTable.createdAt)).limit(200);
+    return res.json({ success: true, data });
+  } catch { return res.status(500).json({ success: false, message: 'Reports schema unavailable or query failed' }); }
+};
+
+export const resolveAdminReport = async (req: AuthenticatedRequest, res: Response) => {
+  const { reportId } = req.params;
+  const resolution = req.body?.resolution;
+  if (!isUuid(reportId) || typeof resolution !== 'string' || !resolution.trim() || resolution.length > 2000) return res.status(400).json({ success: false, message: 'Valid report ID and resolution required' });
+  try {
+    const updated = await db.transaction(async tx => {
+      const [report] = await tx.update(adminReportsTable).set({ status: 'resolved', resolution: resolution.trim(), resolvedBy: req.user.id, resolvedAt: new Date() }).where(and(eq(adminReportsTable.id, reportId), eq(adminReportsTable.status, 'open'))).returning();
+      if (report) await tx.insert(adminLogsTable).values({ adminId: req.user.id, action: 'RESOLVE_REPORT', targetId: reportId, metadata: { resolution: resolution.trim() } });
+      return report;
+    });
+    if (!updated) return res.status(404).json({ success: false, message: 'Open report not found' });
+    return res.json({ success: true, data: updated });
+  } catch { return res.status(500).json({ success: false, message: 'Error resolving report' }); }
+};
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -183,6 +229,18 @@ export const moderateUser = {
 };
 
 export const moderateCourse = {
+  approveCourse: async (req: AuthenticatedRequest, res: Response) => {
+    if (!isUuid(req.params.courseId)) return res.status(400).json({ success: false, message: 'Invalid course ID' });
+    try {
+      const updated = await db.transaction(async tx => {
+        const [course] = await tx.update(coursesTable).set({ isDismissed: false, dismissReason: null, dismissedAt: null }).where(eq(coursesTable.id, req.params.courseId)).returning();
+        if (course) await tx.insert(adminLogsTable).values({ adminId: req.user.id, action: 'APPROVE_COURSE', targetId: course.id });
+        return course;
+      });
+      if (!updated) return res.status(404).json({ success: false, message: 'Course not found' });
+      return res.json({ success: true, data: updated });
+    } catch { return res.status(500).json({ success: false, message: 'Error approving course' }); }
+  },
   dismissCourse: async (req: Request, res: Response) => {
     try {
       const { courseId } = req.params;
@@ -198,6 +256,7 @@ export const moderateCourse = {
         .where(eq(coursesTable.id, courseId))
         .returning();
 
+      if (!dismissedCourse.length) return res.status(404).json({ success: false, message: 'Course not found' });
       return res.status(200).json({
         success: true,
         message: 'Course dismissed successfully',
@@ -380,45 +439,18 @@ export const getRevenueAnalytics = async (req: Request, res: Response) => {
 // Platform Overview Analytics
 export const getPlatformOverview = async (req: Request, res: Response) => {
   try {
-    const overview = await db
-      .select({
-        // User Metrics
-        totalUsers: sql<number>`COUNT(DISTINCT ${usersTable.id})`,
-        totalEducators: sql<number>`COUNT(DISTINCT ${educatorsTable.id})`,
-        verifiedUsers: sql<number>`COUNT(CASE WHEN ${usersTable.verified} = true THEN 1 END)`,
-        
-        // Course Metrics
-        totalCourses: sql<number>`COUNT(DISTINCT ${coursesTable.id})`,
-        activeCourses: sql<number>`COUNT(DISTINCT CASE WHEN ${coursesTable.end} >= NOW() THEN ${coursesTable.id} END)`,
-        totalCategories: sql<number>`COUNT(DISTINCT ${categoryTable.id})`,
-        totalModules: sql<number>`COUNT(DISTINCT ${modulesTable.id})`,
-        
-        // Content Metrics
-        totalContent: sql<number>`COUNT(DISTINCT ${contentTable.id})`,
-        
-        // Financial Metrics
-        totalRevenue: sql<number>`SUM(${transactionsTable.amount})`,
-        successfulTransactions: sql<number>`COUNT(CASE WHEN ${transactionsTable.status} = 'completed' THEN 1 END)`,
-        
-        // Review Metrics
-        totalReviews: sql<number>`COUNT(DISTINCT ${reviewsTable.id})`,
-        averageRating: sql<number>`AVG(${reviewsTable.rating})`,
-        
-        // Support Metrics
-        totalDoubts: sql<number>`COUNT(DISTINCT ${doubtsTable.id})`,
-        resolvedDoubts: sql<number>`COUNT(CASE WHEN ${doubtsTable.resolved} = true THEN 1 END)`,
-      })
-      .from(usersTable)
-      .leftJoin(educatorsTable, eq(usersTable.id, educatorsTable.userId))
-      .leftJoin(coursesTable, eq(educatorsTable.id, coursesTable.educatorId))
-      .leftJoin(transactionsTable, eq(coursesTable.id, transactionsTable.courseId))
-      .leftJoin(reviewsTable, eq(coursesTable.id, reviewsTable.courseId))
-      .leftJoin(doubtsTable, eq(usersTable.id, doubtsTable.userId));
-
-    return res.status(200).json({
-      success: true,
-      data: overview[0]
-    });
+    const [users, educators, courses, categories, modules, content, payments, reviews, doubts] = await Promise.all([
+      db.select({ totalUsers: count(), verifiedUsers: sql<number>`count(*) filter (where ${usersTable.verified})` }).from(usersTable),
+      db.select({ totalEducators: count() }).from(educatorsTable),
+      db.select({ totalCourses: count(), activeCourses: sql<number>`count(*) filter (where ${coursesTable.end} >= now() and not ${coursesTable.isDismissed})` }).from(coursesTable),
+      db.select({ totalCategories: count() }).from(categoryTable),
+      db.select({ totalModules: count() }).from(modulesTable),
+      db.select({ totalContent: count() }).from(contentTable),
+      db.select({ totalRevenue: sql<string>`coalesce(sum(${transactionsTable.amount}) filter (where ${transactionsTable.status} = 'completed'), 0)`, successfulTransactions: sql<number>`count(*) filter (where ${transactionsTable.status} = 'completed')` }).from(transactionsTable),
+      db.select({ totalReviews: count(), averageRating: avg(reviewsTable.rating) }).from(reviewsTable),
+      db.select({ totalDoubts: count(), resolvedDoubts: sql<number>`count(*) filter (where ${doubtsTable.resolved})` }).from(doubtsTable),
+    ]);
+    return res.json({ success: true, data: { ...users[0], ...educators[0], ...courses[0], ...categories[0], ...modules[0], ...content[0], ...payments[0], ...reviews[0], ...doubts[0] } });
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -580,7 +612,7 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response) => {
     const { email } = req.body;
 
     // Check if inviting user is super admin
-    if (!invitingAdmin.isSuperAdmin) {
+    if (!invitingAdmin || !await db.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.id, invitingAdmin.id), eq(usersTable.role, "superadmin"))).limit(1).then(rows => rows.length > 0)) {
       return res.status(403).json({
         success: false,
         message: 'Only super admins can invite new admins'
@@ -602,11 +634,7 @@ export const inviteAdmin = async (req: AuthenticatedRequest, res: Response) => {
 
     // Send invitation email
     const inviteUrl = `${process.env.FRONTEND_URL}/admin/register?token=${inviteToken}`;
-    await sendEmail({
-      to: email,
-      subject: 'Admin Invitation',
-      text: `You've been invited to become an admin. Register here: ${inviteUrl}`
-    });
+    await sendEmail(email, 'Admin Invitation', `You have been invited to become an admin. Register here: ${inviteUrl}`);
 
     return res.status(200).json({
       success: true,
@@ -625,51 +653,18 @@ export const registerAdmin = async (req: Request, res: Response) => {
   try {
     const { name, email, password, inviteToken } = req.body;
 
+    if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || typeof password !== 'string' || password.length < 8 || typeof inviteToken !== 'string' || !/^[0-9a-f]{64}$/.test(inviteToken)) return res.status(400).json({ success: false, message: 'Invalid registration details' });
+
     // Validate invite token
-    const invite = await db.select()
-      .from(adminInvitesTable)
-      .where(and(
-        eq(adminInvitesTable.inviteToken, inviteToken),
-        eq(adminInvitesTable.email, email),
-        eq(adminInvitesTable.used, false),
-        gt(adminInvitesTable.expiresAt, new Date())
-      ))
-      .limit(1);
-
-    if (!invite.length) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired invitation'
-      });
-    }
-
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create admin user
-    const [newAdmin] = await db.insert(usersTable)
-      .values({
-        name,
-        email,
-        password: hashedPassword,
-        isAdmin: true,
-        role: 'admin',
-        verified: true
-      })
-      .returning();
-
-    // Mark invite as used
-    await db.update(adminInvitesTable)
-      .set({ used: true })
-      .where(eq(adminInvitesTable.inviteToken, inviteToken));
-
-    // Log admin creation
-    await db.insert(adminLogsTable).values({
-      adminId: invite[0].createdBy,
-      action: 'CREATE_ADMIN',
-      targetId: newAdmin.id,
-      metadata: { email: newAdmin.email }
+    const created = await db.transaction(async tx => {
+      const [invite] = await tx.update(adminInvitesTable).set({ used: true }).where(and(eq(adminInvitesTable.inviteToken, inviteToken), eq(adminInvitesTable.email, email), eq(adminInvitesTable.used, false), gt(adminInvitesTable.expiresAt, new Date()))).returning();
+      if (!invite?.createdBy) return false;
+      const [newAdmin] = await tx.insert(usersTable).values({ name: name.trim(), email, password: hashedPassword, isAdmin: true, role: 'admin', verified: true }).returning();
+      await tx.insert(adminLogsTable).values({ adminId: invite.createdBy, action: 'CREATE_ADMIN', targetId: newAdmin.id, metadata: { email: newAdmin.email } });
+      return true;
     });
+    if (!created) return res.status(400).json({ success: false, message: 'Invalid or expired invitation' });
 
     return res.status(201).json({
       success: true,
@@ -683,5 +678,3 @@ export const registerAdmin = async (req: Request, res: Response) => {
     });
   }
 };
-
-

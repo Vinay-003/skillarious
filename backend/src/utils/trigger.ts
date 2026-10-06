@@ -170,15 +170,6 @@ export const replyToDoubt = async (req: AuthenticatedRequest, res: Response) => 
       });
     }
 
-    // Add console.log to debug the values
-    console.log('Inserting message with:', { doubtId, content });
-
-    // Add debug logs
-    console.log('Attempting to insert message with data:', {
-      doubtId,
-      content,
-      isResponse: true
-    });
 
     const newMessage = await db.insert(messagesTable)
       .values({
@@ -192,7 +183,6 @@ export const replyToDoubt = async (req: AuthenticatedRequest, res: Response) => 
         throw err;
       });
 
-    console.log('Inserted message result:', newMessage);
 
     // Update doubt status and assign educator
     await db.update(doubtsTable)

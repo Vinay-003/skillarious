@@ -1,0 +1,20 @@
+-- Run only after inspecting the target schema. Backend access uses service-role
+-- credentials and application authorization; no browser-side table grants.
+-- Enabling RLS without client policies denies anon/authenticated direct reads.
+ALTER TABLE IF EXISTS public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.otps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.educators ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.category ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.category_courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.modules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.doubts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.content ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.admin_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.admin_invites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.admin_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.paypal_orders ENABLE ROW LEVEL SECURITY;

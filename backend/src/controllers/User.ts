@@ -12,20 +12,19 @@ interface AuthenticatedRequest extends Request {
 export const updateProfile = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user.id;
-    console.log(userId)
-    const { name, phone, gender, age ,pfp} = req.body;
-    console.log(req.body)
+    const { name, phone, gender, age ,pfp} = req.body ?? {};
+    const cleanName = typeof name === 'string' ? name.trim() : '';
 
     // Validate required fields
-    if (!name ) {
+    if (!cleanName || cleanName.length > 100) {
       return res.status(400).json({
         success: false,
-        message: 'Name is required'
+        message: 'Name must contain 1–100 characters'
       });
     }
 
     // Validate phone format if provided
-    if (phone && !/^\+?[1-9]\d{1,14}$/.test(phone)) {
+    if (phone !== undefined && phone !== null && (typeof phone !== 'string' || (phone !== '' && !/^\+?[1-9]\d{1,14}$/.test(phone)))) {
       return res.status(400).json({
         success: false,
         message: 'Invalid phone number format'
@@ -41,12 +40,13 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     }
 
     // Validate age if provided
-    if (age) {
-      const ageNum = parseInt(age, 10);
-      if (isNaN(ageNum)) {
+    let ageNum: number | null | undefined;
+    if (age !== undefined) {
+      ageNum = age === null ? null : typeof age === 'number' ? age : typeof age === 'string' && /^\d{1,3}$/.test(age) ? Number(age) : NaN;
+      if (ageNum !== null && (!Number.isInteger(ageNum) || ageNum < 1 || ageNum > 120)) {
         return res.status(400).json({
           success: false,
-          message: 'Age must be a number'
+          message: 'Age must be an integer between 1 and 120, or empty'
         });
       }
     }
@@ -66,10 +66,10 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
 
     // Create update object with only defined values
     const updateData: Record<string, any> = {};
-    if (name) updateData.name = name;
+    updateData.name = cleanName;
     if (phone !== undefined) updateData.phone = phone;
     if (gender !== undefined) updateData.gender = gender;
-    if (age !== undefined) updateData.age = parseInt(age, 10);
+    if (age !== undefined) updateData.age = ageNum;
     if (pfp !== undefined) updateData.pfp = pfp;
 
     // Update user profile
@@ -85,11 +85,11 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     return res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      data: updatedUser[0]
+      data: (({ password, refreshToken, ...safe }) => safe)(updatedUser[0])
     });
 
   } catch (error) {
-    console.error('Error updating profile:', error);
+    console.error('Profile update unavailable');
     return res.status(500).json({
       success: false,
       message: 'Failed to update profile'
@@ -122,13 +122,12 @@ export const getProfile = async (req: AuthenticatedRequest, res: Response) => {
     });
 
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error('Profile read unavailable');
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch profile'
     });
   }
 };
-
 
 

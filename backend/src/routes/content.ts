@@ -1,6 +1,6 @@
 import express from 'express';
 import { RequestHandler } from 'express';
-import { createDoubt, replyToDoubt, getRealtimeStatus, getDoubtsByContent, getDoubts, getDoubtDetails } from '../controllers/Doubt.ts';
+import { createDoubt, replyToDoubt, getRealtimeStatus, getDoubtsByContent, getDoubts, getDoubtDetails, resolveDoubt } from '../controllers/Doubt.ts';
 import { createModule, updateModule, deleteModule, getAllModules } from '../controllers/Module.ts';
 import { uploadStudyMaterial, updateStudyMaterial, deleteStudyMaterial, getModuleStudyMaterials } from '../controllers/StudyMaterial.ts';
 import { createCategory, updateCategory, deleteCategory, getAllCategories, getCategoryBySearch } from '../controllers/Category.ts';
@@ -20,6 +20,7 @@ const router = express.Router();
 router.post('/createDoubt', authenticateUser as unknown as RequestHandler, createDoubt as unknown as RequestHandler);
 router.post('/replyToDoubt/:id', authenticateUser as unknown as RequestHandler, replyToDoubt as unknown as RequestHandler);
 router.get('/doubts/content/:contentId', authenticateUser as unknown as RequestHandler, getDoubtsByContent as unknown as RequestHandler);
+router.patch('/doubts/:id/resolve', authenticateUser as unknown as RequestHandler, resolveDoubt as unknown as RequestHandler);
 router.get('/doubts/:id', authenticateUser as unknown as RequestHandler, getDoubtDetails as unknown as RequestHandler);
 router.get('/doubts', authenticateUser as unknown as RequestHandler, getDoubts as unknown as RequestHandler);
 
@@ -35,7 +36,7 @@ router.get('/getAllModules/:courseId', getAllModules as unknown as RequestHandle
 router.post('/uploadStudyMaterial', authenticateUser as unknown as RequestHandler, uploadStudyMaterial as unknown as RequestHandler);
 router.put('/updateStudymaterial/:materialId', authenticateUser as unknown as RequestHandler, updateStudyMaterial as unknown as RequestHandler);
 router.delete('/deleteStudyMaterial/:materialId', authenticateUser as unknown as RequestHandler, deleteStudyMaterial as unknown as RequestHandler);
-router.get('/getModuleStudyMaterials/:moduleId', getModuleStudyMaterials as unknown as RequestHandler);
+router.get('/getModuleStudyMaterials/:moduleId', authenticateUser as unknown as RequestHandler, getModuleStudyMaterials as unknown as RequestHandler);
 
 // Category related routes
 router.post('/createCategory', authenticateUser as unknown as RequestHandler, createCategory as unknown as RequestHandler);
@@ -48,7 +49,7 @@ router.get('/searchCategory', getCategoryBySearch as unknown as RequestHandler);
 // Class related routes
 router.post('/class/:moduleId', authenticateUser as unknown as RequestHandler, createClass as unknown as RequestHandler);
 router.get('/getModuleClasses/:moduleId', authenticateUser as unknown as RequestHandler, getModuleClasses as unknown as RequestHandler);
-router.get('/getClassStream/:contentId', getClassStream as unknown as RequestHandler);
+router.get('/getClassStream/:contentId', authenticateUser as unknown as RequestHandler, getClassStream as unknown as RequestHandler);
 router.put('/updateClass/:contentId', authenticateUser as unknown as RequestHandler, updateClass as unknown as RequestHandler);
 router.delete('/deleteClass/:contentId', authenticateUser as unknown as RequestHandler, deleteClass as unknown as RequestHandler);
 

@@ -84,7 +84,6 @@ export const getEducatorProfile = async (req: AuthenticatedRequest, res: Respons
         message: 'User not found'
       });
     }
-    console.log(user)
     if (!user[0].isEducator) {
       return res.status(403).json({
         success: false,

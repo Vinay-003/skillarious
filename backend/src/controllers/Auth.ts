@@ -1,49 +1,47 @@
 import { db } from "../db/index.ts";
 import {usersTable as users, usersTable} from "../db/schema.ts"
-import {eq} from "drizzle-orm";
-import {config} from "dotenv";
+import {and, eq} from "drizzle-orm";
+
 import bcrypt from "bcrypt";
 import jwt, { verify } from "jsonwebtoken";
 import { NextFunction, Request, Response } from "express";
 import {generateAccessToken, generateRefreshToken} from "../utils/generateToken.ts";
+import { issueOtp, consumeOtp } from "../utils/otp.ts";
+import { emailFailure } from '../utils/emailErrors.ts';
 
 interface AuthenticatedRequest extends Request {
   user?: any;
 }
 
-const isDbUnavailableError = (error: unknown): boolean => {
+const isDbUnavailableError = (error: unknown, depth = 0): boolean => {
   if (!error || typeof error !== 'object') return false;
-  const err = error as { code?: string; message?: string };
+  const err = error as { code?: string; message?: string; cause?: unknown };
   return (
     err.code === 'ENETUNREACH' ||
     err.code === 'ECONNREFUSED' ||
     err.code === 'ETIMEDOUT' ||
     err.code === '57P01' ||
-    (typeof err.message === 'string' && err.message.toLowerCase().includes('connect enetunreach'))
+    (typeof err.message === 'string' && err.message.toLowerCase().includes('connect enetunreach')) ||
+    (depth < 3 && isDbUnavailableError(err.cause, depth + 1))
   );
 };
 
-config({path: ".env.local"});
 
-// Add a check at the start of your server initialization
-if (!process.env.JWT_SECRET) {
-    console.error("JWT_SECRET is not defined in environment variables");
-    process.exit(1);
-}
+
+export const normalizeEmail = (value: unknown): string => typeof value === 'string' ? value.trim().toLowerCase() : '';
+export const validEmail = (value: string): boolean => value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+export const validPassword = (value: unknown): value is string => typeof value === 'string' && value.length >= 8 && Buffer.byteLength(value, 'utf8') <= 72;
 
 // logic for SIGN UP
 export const signUp = async (req: Request,res:Response) => {
     try{
    //fetch details
-   const {name,email,password} = req.body as {name: string, email: string, password: string};
-   //validate data
-   if(!name || !email || !password){
-     res.status(400).json({
-        success: false,
-        message: "Fill the details properly",
-     });return;
-     
-    }
+   const {name,password} = req.body ?? {};
+   const email = normalizeEmail(req.body?.email);
+   const cleanName = typeof name === 'string' ? name.trim() : '';
+   if (!validEmail(email) || cleanName.length < 1 || cleanName.length > 100 || !validPassword(password)) {
+     res.status(400).json({ success: false, message: 'Invalid name, email or password (8-72 bytes)' }); return;
+   }
     // check if user has already signed up 
     const existingUser = await db.select().from(users).where(eq(users.email,email));
 
@@ -59,12 +57,16 @@ export const signUp = async (req: Request,res:Response) => {
      
     // now create an entry in DB
    const newUser = await db.insert(users).values({
-    name,
+    name: cleanName,
     email,
     password: hashedPassword,
-    verified: true ,
+    verified: false ,
    }).returning();
 
+   try { await issueOtp(email); }
+   catch (error) { // Keep the pending account available for a later resend.
+     res.status(503).json({ success: false, ...emailFailure(error), requiresVerification: true, user: { email } }); return;
+   }
    //  response
     res.status(200).json({
       success: true,
@@ -72,13 +74,12 @@ export const signUp = async (req: Request,res:Response) => {
       user: {
         name: newUser[0].name,
         email: newUser[0].email,
-        verified: true
+        verified: false
       },
-      requiresVerification: false
+      requiresVerification: true
     });
     return;
    }catch(error){
-        console.log(error);
          res.status(500).json({
            success: false,
            message: "Internal Server error"
@@ -90,9 +91,10 @@ export const signUp = async (req: Request,res:Response) => {
 // logic for LOGIN 
 export const login = async (req: Request, res: Response) => {
     try{
-    const {email,password} = req.body;
+    const email = normalizeEmail(req.body?.email);
+    const password = req.body?.password;
     
-    if(!email || !password){
+    if(!validEmail(email) || typeof password !== "string" || !password){
          res.status(400).json({
            success: false,
            message: "Fill the details properly",
@@ -106,6 +108,7 @@ export const login = async (req: Request, res: Response) => {
         return;
     }
     
+    if (user[0].isBanned) { res.status(403).json({ success: false, message: "Account disabled" }); return; }
     const match = await bcrypt.compare(password,user[0].password);
     if(!match){
          res.status(401).json({
@@ -115,6 +118,7 @@ export const login = async (req: Request, res: Response) => {
         return;
     }
     
+    if (!user[0].verified) { res.status(403).json({ success: false, message: "Verify your email before signing in", requiresVerification: true }); return; }
     const accessToken = generateAccessToken(user[0].id, user[0].email);
     const refreshToken = generateRefreshToken(user[0].id);
 
@@ -128,7 +132,7 @@ export const login = async (req: Request, res: Response) => {
     });return;
 
     }catch(error){
-     console.log(error);
+
       if (isDbUnavailableError(error)) {
         res.status(503).json({
           success: false,
@@ -146,9 +150,9 @@ export const login = async (req: Request, res: Response) => {
 
 export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email } = req.body;
+    const email = normalizeEmail(req.body?.email);
 
-    if (!email) {
+    if (!validEmail(email)) {
       res.status(400).json({ success: false, message: "Email is required" });
       return;
     }
@@ -159,30 +163,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       .where(eq(usersTable.email, email))
       .limit(1);
 
-    if (!user.length) {
-      res.status(404).json({ 
-        success: false, 
-        message: "No account exists with this email address" 
-      });
-      return;
-    }
-
-    // Use the existing generateOtp endpoint
-    const response = await fetch(`${process.env.HOST_URL}/api/v1/otp/generate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-
-    const data = await response.json();
-
-    if (!data.success) {
-      res.status(500).json({
-        success: false,
-        message: data.message || "Failed to send OTP"
-      });
-      return;
-    }
+    if (user.length) await issueOtp(email);
 
     res.status(200).json({
       success: true,
@@ -191,7 +172,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     return;
 
   } catch (error) {
-    console.error("Forgot password error:", error);
+
     res.status(500).json({ 
       success: false, 
       message: "Failed to process password reset request" 
@@ -202,9 +183,10 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
 
 export const resetPassword = async (req: Request, res: Response) => {
   try {
-    const { email, otp, newPassword } = req.body;
+    const { otp, newPassword } = req.body ?? {};
+    const email = normalizeEmail(req.body?.email);
 
-    if (!email || !otp || !newPassword) {
+    if (!validEmail(email) || typeof otp !== "string" || !/^\d{6}$/.test(otp) || !validPassword(newPassword)) {
       res.status(400).json({ 
         success: false, 
         message: "Email, OTP, and new password are required" 
@@ -212,30 +194,14 @@ export const resetPassword = async (req: Request, res: Response) => {
       return;
     }
 
-    // Verify OTP
-    const response = await fetch(`${process.env.HOST_URL}/api/v1/otp/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
-    });
-
-    const data = await response.json();
-      
-    if (!data.success) {
-      res.status(400).json({
-        success: false,
-        message: data.message || 'Invalid or expired OTP'
-      });
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    if (!await consumeOtp(email, otp, async (tx) => {
+      const changed = await tx.update(users).set({ password: hashedPassword, refreshToken: null }).where(eq(users.email, email)).returning({ id: users.id });
+      if (!changed.length) throw new Error('User update failed');
+    })) {
+      res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
       return;
     }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password in database
-    await db.update(users)
-      .set({ password: hashedPassword })
-      .where(eq(users.email, email));
 
     res.status(200).json({ 
       success: true, 
@@ -244,7 +210,7 @@ export const resetPassword = async (req: Request, res: Response) => {
     return;
 
   } catch (error) {
-    console.error('Reset password error:', error);
+
     res.status(500).json({ 
       success: false, 
       message: "Failed to reset password" 
@@ -258,10 +224,10 @@ export const resetPassword = async (req: Request, res: Response) => {
 export const refreshToken = async(req: Request, res: Response): Promise<void> => {
     try {
         // fetch the token
-        const { token } = req.body;
+        const { token } = req.body ?? {};
         
         // validate token presence
-        if (!token) {
+        if (typeof token !== 'string' || !token) {
             res.status(401).json({
                 success: false,
                 message: "Refresh token is required"
@@ -269,10 +235,13 @@ export const refreshToken = async(req: Request, res: Response): Promise<void> =>
             return;
         }
 
+        if (!process.env.REFRESH_SECRET) {
+            res.status(503).json({ success: false, message: 'Authentication service unavailable' }); return;
+        }
         // verify the refresh token
         let decoded: any;
         try {
-            decoded = jwt.verify(token, process.env.REFRESH_SECRET || "refresh_secret");
+            decoded = jwt.verify(token, process.env.REFRESH_SECRET);
         } catch (error) {
             if (error instanceof jwt.TokenExpiredError) {
                 res.status(401).json({
@@ -301,13 +270,10 @@ export const refreshToken = async(req: Request, res: Response): Promise<void> =>
             return;
         }
 
+        if (user[0].isBanned || !user[0].verified) { res.status(403).json({ success: false, message: "Account unavailable" }); return; }
+
         // Check if the stored refresh token matches
         if (user[0].refreshToken !== token) {
-            // Clear the invalid refresh token from database
-            await db.update(users)
-                .set({ refreshToken: null })
-                .where(eq(users.id, user[0].id));
-
             res.status(403).json({
                 success: false,
                 message: "Refresh token has been revoked"
@@ -320,9 +286,11 @@ export const refreshToken = async(req: Request, res: Response): Promise<void> =>
         const newRefreshToken = generateRefreshToken(decoded.id);
 
         // Update refresh token in database
-        await db.update(users)
+        const changed = await db.update(users)
             .set({ refreshToken: newRefreshToken })
-            .where(eq(users.id, user[0].id));
+            .where(and(eq(users.id, user[0].id), eq(users.refreshToken, token)))
+            .returning({ id: users.id });
+        if (!changed.length) { res.status(403).json({ success: false, message: 'Refresh token has been revoked' }); return; }
 
         // Send new tokens
         res.status(200).json({
@@ -334,8 +302,7 @@ export const refreshToken = async(req: Request, res: Response): Promise<void> =>
         return;
 
     } catch (error) {
-        console.error("Refresh token error:", error);
-        res.status(500).json({
+        res.status(isDbUnavailableError(error) ? 503 : 500).json({
             success: false,
             message: "Internal Server Error"
         });
@@ -353,21 +320,13 @@ export const refreshToken = async(req: Request, res: Response): Promise<void> =>
              return;
         }
 
-        // Check if the token exists
-        const user = await db.select().from(users).where(eq(users.refreshToken, refreshToken));
-        if (!user.length) {
-             res.status(404).json({ success: false, message: "User not found" });
-             return;
-        }
-
-        // Remove refresh token from database
-        await db.update(users).set({ refreshToken: null }).where(eq(users.id, user[0].id));
+        await db.update(users).set({ refreshToken: null }).where(eq(users.refreshToken, refreshToken));
 
          res.status(200).json({ success: true, message: "Logged out successfully" });
          return;
 
     } catch (error) {
-        console.error(error);
+
          res.status(500).json({ success: false, message: "Internal Server Error" });
          return;
     }
@@ -418,13 +377,8 @@ export const authenticateUser = async (req: AuthenticatedRequest, res: Response,
                 });
             }
 
-            // if (!user.isActive) {
-            //     return res.status(401).json({
-            //         success: false,
-            //         message: "User account is disabled",
-            //         code: "ACCOUNT_DISABLED"
-            //     });
-            // }
+            if (!user.verified) return res.status(403).json({ success: false, message: "Email verification required", code: "EMAIL_UNVERIFIED" });
+            if (user.isBanned) return res.status(403).json({ success: false, message: "Account disabled", code: "ACCOUNT_DISABLED" });
 
             req.user = {
                 id: user.id,
@@ -445,11 +399,13 @@ export const authenticateUser = async (req: AuthenticatedRequest, res: Response,
             throw error;
         }
     } catch (error) {
+        if (!process.env.JWT_SECRET || isDbUnavailableError(error)) {
+            return res.status(503).json({ success: false, message: 'Authentication service unavailable', code: 'AUTH_UNAVAILABLE' });
+        }
         return res.status(401).json({
             success: false,
             message: "Authentication failed",
             code: "AUTH_FAILED",
-            error: error
         });
     }
 };
@@ -472,7 +428,11 @@ export const validateSession = async (req: AuthenticatedRequest, res: Response) 
                 email: usersTable.email,
                 role: usersTable.role,
                 isAdmin: usersTable.isAdmin,
-                isEducator: usersTable.isEducator
+                isEducator: usersTable.isEducator,
+                name: usersTable.name,
+                verified: usersTable.verified,
+                pfp: usersTable.pfp,
+                phone: usersTable.phone
             })
             .from(usersTable)
             .where(eq(usersTable.id, userId))
@@ -493,7 +453,11 @@ export const validateSession = async (req: AuthenticatedRequest, res: Response) 
                 email: user.email,
                 role: user.role,
                 isAdmin: user.isAdmin,
-                isEducator: user.isEducator
+                isEducator: user.isEducator,
+                name: user.name,
+                verified: user.verified,
+                pfp: user.pfp,
+                phone: user.phone
             }
         });
     } catch (error) {
