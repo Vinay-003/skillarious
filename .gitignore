@@ -11,6 +11,7 @@ node_modules/
 backend/supabase/.temp/
 backend/uploads/
 reports/private/
+backend/reports/private/
 
 # Build outputs
 dist/
