@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: skillarious-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    # Email uses Resend HTTPS; Free blocks outbound SMTP ports.
+    autoDeploy: false
+    buildCommand: npm ci --include=dev && npm run typecheck
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SSL_CA_FILE
+        value: /etc/secrets/supabase-ca.crt
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REFRESH_SECRET
+        generateValue: true
+      - key: SUPABASE_URL
+        value: https://ykllmcwljsfeluhpvzbv.supabase.co
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: TRUST_PROXY
+        value: "1"
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_MERCHANT_ID
+        sync: false
+      - key: APINEX_API_KEY
+        sync: false
+      - key: APINEX_PRIMARY_MODEL
+        value: free/deepseek-v4.1-flash
+      - key: APINEX_FALLBACK_MODEL
+        value: free/mimo-v2.6-pro
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: EMAIL_RELAY_URL
+        sync: false
+      - key: EMAIL_RELAY_TOKEN
+        sync: false

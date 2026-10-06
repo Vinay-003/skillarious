@@ -1,0 +1,100 @@
+area,method,route,local_auth_evidence,positive_live_evidence
+auth,POST,/api/v1/auth/login,public/token-flow; successful live check pending,blocked: new service configuration
+auth,POST,/api/v1/auth/signup,public/token-flow; successful live check pending,blocked: new service configuration
+auth,POST,/api/v1/auth/refreshtoken,public/token-flow; successful live check pending,blocked: new service configuration
+auth,POST,/api/v1/auth/logout,public/token-flow; successful live check pending,blocked: new service configuration
+auth,POST,/api/v1/auth/forgotpassword,public/token-flow; successful live check pending,blocked: new service configuration
+auth,POST,/api/v1/auth/resetpassword,public/token-flow; successful live check pending,blocked: new service configuration
+auth,GET,/api/v1/auth/validate,missing-token contract tested,blocked: new service configuration
+otp,POST,/api/v1/otp/generate,public/token-flow; successful live check pending,blocked: new service configuration
+otp,POST,/api/v1/otp/verify,public/token-flow; successful live check pending,blocked: new service configuration
+courses,POST,/api/v1/courses/create/:educatorId,missing-token contract tested,blocked: new service configuration
+courses,PUT,/api/v1/courses/update/:CourseId,missing-token contract tested,blocked: new service configuration
+courses,DELETE,/api/v1/courses/delete/:CourseId,missing-token contract tested,blocked: new service configuration
+courses,POST,/api/v1/courses/addCategory,missing-token contract tested,blocked: new service configuration
+courses,GET,/api/v1/courses/all,public route,passed: hosted empty list; populated data pending
+courses,GET,/api/v1/courses/single/:id,public route; malformed ID rejected,passed: hosted nonexistent UUID 404; populated detail pending
+courses,GET,/api/v1/courses/search,public route; scalar bounded filters tested,passed: hosted empty searches and invalid-filter rejection; populated matches pending
+courses,GET,/api/v1/courses/searchByCategory,public route; scalar bounded filter tested,passed: hosted empty category query and invalid-filter rejection; populated matches pending
+courses,GET,/api/v1/courses/educator/:id,public route; malformed ID rejected,passed: hosted empty educator list; populated matches pending
+courses,GET,/api/v1/courses/ownership/:courseId,missing-token contract tested,blocked: new service configuration
+courses,GET,/api/v1/courses/access/:courseId,missing-token contract tested,blocked: new service configuration
+courses,POST,/api/v1/courses/purchase/:courseId,missing-token contract tested,blocked: new service configuration
+courses,GET,/api/v1/courses/purchased,missing-token contract tested,blocked: new service configuration
+payments,GET,/api/v1/payments/config,public/token-flow; successful live check pending,blocked: new service configuration
+payments,POST,/api/v1/payments/create,missing-token contract tested,blocked: new service configuration
+payments,POST,/api/v1/payments/verify,missing-token contract tested,blocked: new service configuration
+payments,GET,/api/v1/payments/history,missing-token contract tested,blocked: new service configuration
+payments,POST,/api/v1/payments/refund,missing-token contract tested,blocked: new service configuration
+reviews,POST,/api/v1/reviews/create,missing-token contract tested,blocked: new service configuration
+reviews,PUT,/api/v1/reviews/update/:courseId,missing-token contract tested,blocked: new service configuration
+reviews,DELETE,/api/v1/reviews/delete/:courseId,missing-token contract tested,blocked: new service configuration
+reviews,GET,/api/v1/reviews/averagerating/:courseId,public route; malformed ID rejected,passed: hosted numeric-zero average; populated ratings pending
+reviews,GET,/api/v1/reviews/all/:courseId,public route; malformed ID rejected,passed: hosted empty reviews; populated reviews pending
+educators,POST,/api/v1/educators/register,missing-token contract tested,blocked: new service configuration
+educators,GET,/api/v1/educators/profile,missing-token contract tested,blocked: new service configuration
+educators,PUT,/api/v1/educators/profile,missing-token contract tested,blocked: new service configuration
+educators,PATCH,/api/v1/educators/toggle-doubt,missing-token contract tested,blocked: new service configuration
+content,POST,/api/v1/content/createDoubt,missing-token contract tested,blocked: new service configuration
+content,POST,/api/v1/content/replyToDoubt/:id,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/doubts/content/:contentId,missing-token contract tested,blocked: new service configuration
+content,PATCH,/api/v1/content/doubts/:id/resolve,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/doubts/:id,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/doubts,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/realtime-status,public/token-flow; successful live check pending,blocked: new service configuration
+content,POST,/api/v1/content/createModule,missing-token contract tested,blocked: new service configuration
+content,PUT,/api/v1/content/updateModule/:moduleId,missing-token contract tested,blocked: new service configuration
+content,DELETE,/api/v1/content/deleteModule/:moduleId,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/getAllModules/:courseId,public/token-flow; successful live check pending,blocked: new service configuration
+content,POST,/api/v1/content/uploadStudyMaterial,missing-token contract tested,blocked: new service configuration
+content,PUT,/api/v1/content/updateStudymaterial/:materialId,missing-token contract tested,blocked: new service configuration
+content,DELETE,/api/v1/content/deleteStudyMaterial/:materialId,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/getModuleStudyMaterials/:moduleId,missing-token contract tested,blocked: new service configuration
+content,POST,/api/v1/content/createCategory,missing-token contract tested,blocked: new service configuration
+content,PUT,/api/v1/content/updateCategory/:categoryId,missing-token contract tested,blocked: new service configuration
+content,DELETE,/api/v1/content/deleteCategory/:categoryId,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/getAllCategories,public/token-flow; successful live check pending,blocked: new service configuration
+content,GET,/api/v1/content/searchCategory,public/token-flow; successful live check pending,blocked: new service configuration
+content,POST,/api/v1/content/class/:moduleId,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/getModuleClasses/:moduleId,missing-token contract tested,blocked: new service configuration
+content,GET,/api/v1/content/getClassStream/:contentId,missing-token contract tested,blocked: new service configuration
+content,PUT,/api/v1/content/updateClass/:contentId,missing-token contract tested,blocked: new service configuration
+content,DELETE,/api/v1/content/deleteClass/:contentId,missing-token contract tested,blocked: new service configuration
+users,GET,/api/v1/users/getprofile,missing-token contract tested,blocked: new service configuration
+users,PUT,/api/v1/users/updateprofile,missing-token contract tested,blocked: new service configuration
+student,GET,/api/v1/student/history,missing-token contract tested,blocked: new service configuration
+student,PUT,/api/v1/student/history/:courseId,missing-token contract tested,blocked: new service configuration
+student,GET,/api/v1/student/likes,missing-token contract tested,blocked: new service configuration
+student,PUT,/api/v1/student/likes/:courseId,missing-token contract tested,blocked: new service configuration
+student,DELETE,/api/v1/student/likes/:courseId,missing-token contract tested,blocked: new service configuration
+student,GET,/api/v1/student/playlists,missing-token contract tested,blocked: new service configuration
+student,POST,/api/v1/student/playlists,missing-token contract tested,blocked: new service configuration
+student,DELETE,/api/v1/student/playlists/:playlistId,missing-token contract tested,blocked: new service configuration
+student,PUT,/api/v1/student/playlists/:playlistId/courses/:courseId,missing-token contract tested,blocked: new service configuration
+student,DELETE,/api/v1/student/playlists/:playlistId/courses/:courseId,missing-token contract tested,blocked: new service configuration
+student,GET,/api/v1/student/subscriptions,missing-token contract tested,blocked: new service configuration
+student,PUT,/api/v1/student/subscriptions/:educatorId,missing-token contract tested,blocked: new service configuration
+student,DELETE,/api/v1/student/subscriptions/:educatorId,missing-token contract tested,blocked: new service configuration
+student,GET,/api/v1/student/enrolledCourses,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/register,public/token-flow; successful live check pending,blocked: new service configuration
+admin,GET,/api/v1/admin/overview,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/users,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/courses,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/logs,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/reports,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/reports/:reportId/resolve,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/moderate/course/:courseId/approve,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/moderate/user/:userId/ban,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/moderate/user/:userId/unban,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/moderate/course/:courseId/dismiss,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/moderate/module/:moduleId/dismiss,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/moderate/content/:contentId/dismiss,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/analytics/users,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/analytics/engagement,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/analytics/revenue,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/analytics/platform-overview,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/analytics/reviews,missing-token contract tested,blocked: new service configuration
+admin,GET,/api/v1/admin/analytics/educators,missing-token contract tested,blocked: new service configuration
+admin,POST,/api/v1/admin/invite,missing-token contract tested,blocked: new service configuration
+ai,POST,/api/v1/ai/ask,missing-token contract tested,blocked: new service configuration
+ai,POST,/api/v1/ai/recommend,missing-token contract tested,blocked: new service configuration
